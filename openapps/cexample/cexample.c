@@ -22,7 +22,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 //=========================== defines =========================================
-
+#define CEXAMPLE_NOTIFY_PERIOD  10000
+#define CEXAMPLE_UPDATE_PERIOD  10000
 
 const uint8_t cexample_path0[] = "tasa";
 
@@ -44,6 +45,11 @@ void    cexample_sendDone(OpenQueueEntry_t* msg,
 
 void   cexample_init_graph(void);
 void   cexample_log_topo(void);
+void   cexample_parse(OpenQueueEntry_t* msg);
+
+
+void   cexample_timer_cb(opentimers_id_t id);
+void   cexample_task_cb(void);
 //=========================== public ==========================================
 
 void cexample_init(void) {
@@ -58,7 +64,19 @@ void cexample_init(void) {
     cexample_vars.fd = open(file,O_CREAT | O_RDWR);
     int fd = cexample_vars.fd;
     if(r != 0x2 || l != 0x0){
+        if(r == 0x0 && l == 0x0){
+          dprintf(fd,"[-]{%d.%d} ROOT(gateway) node\n",l,r);
+          return ;
+        }
         dprintf(fd,"[-]{%d.%d} NON-CENTRAL node\n",l,r);
+        cexample_vars.timerId    = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_COAP);
+        opentimers_scheduleIn(
+            cexample_vars.timerId,
+            CEXAMPLE_NOTIFY_PERIOD,
+            TIME_MS,
+            TIMER_PERIODIC,
+            cexample_timer_cb
+      );
         return ;
     }
     dprintf(fd,"[+]{%d.%d} CENTRAL NODE\n",l,r);
@@ -79,7 +97,15 @@ void cexample_init(void) {
     opencoap_register(&cexample_vars.desc);
     cexample_init_graph();
     cexample_log_topo();
-
+    /*
+    opentimers_scheduleIn(
+        icmpv6rpl_vars.timerIdDIO,
+        SLOTFRAME_LENGTH*SLOTDURATION,
+        TIME_MS,
+        TIMER_PERIODIC,
+        icmpv6rpl_timer_DIO_cb
+    );
+    */
 }
 
 //=========================== private =========================================
@@ -115,6 +141,38 @@ void   cexample_log_topo(void){
   }
   dprintf(fd,"----------------------TOPOLOGY-END---------------------\n");
 }
+void   cexample_parse(OpenQueueEntry_t* msg){
+  int fd = cexample_vars.fd;
+  uint8_t* input = msg->payload;
+  open_addr_t srcAdd = msg->l3_sourceAdd;
+  uint16_t from_node = *((uint16_t*)&srcAdd.addr_128b[61]);
+  uint8_t code;
+  uint16_t to_node;
+  dprintf(fd,"[+] FROM {%d}\n",from_node);
+
+  do {
+    code = input[0];
+    switch (code) {
+      case ADD_NEIGHBOR:
+        if(input[3] != 0xff){
+            dprintf(fd,"\t[-] Parsing error {expected : 0xff -- found : 0x%02x}\n",input[3]);
+            return;
+        }
+        to_node = input[1]*0xff + input[2];
+        dprintf(fd,"\t[+] Link added to %02x %02x  --  %d\n",input[1],input[2],to_node);
+
+        //TODO add link
+        input = &input[3];
+        break;
+        default:
+        dprintf(fd,"\t[+] MessageType does not exists %02x\n",code);
+        return;
+        break;
+    }
+
+  } while(*input != 0xff);
+
+}
 owerror_t cexample_receive( OpenQueueEntry_t* msg,
         coap_header_iht*  coap_header,
         coap_option_iht*  coap_incomingOptions,
@@ -128,21 +186,10 @@ owerror_t cexample_receive( OpenQueueEntry_t* msg,
         switch (coap_header->Code) {
            case COAP_CODE_REQ_PUT:
               dprintf(fd,"COAP_CODE_REQ_PUT}\n");
-              // change the LED's state
-              dprintf(fd,"\t--> payload :[ %s ]\n",msg->payload);
-              /*
-              if (msg->payload[0]=='1') {
-                 leds_error_on();
-              } else if (msg->payload[0]=='2') {
-                 leds_error_toggle();
-              } else {
-                 leds_error_off();
-              }
-              */
-              // reset packet payload
+              //dprintf(fd,"\t--> payload :[ %s ]\n",msg->payload);
+              cexample_parse(msg);
               msg->payload                     = &(msg->packet[127]);
               msg->length                      = 0;
-
               // set the CoAP header
               coap_header->Code                = COAP_CODE_RESP_CHANGED;
               outcome                          = E_SUCCESS;
@@ -159,4 +206,19 @@ owerror_t cexample_receive( OpenQueueEntry_t* msg,
 }
 void cexample_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
     openqueue_freePacketBuffer(msg);
+}
+
+void cexample_timer_cb(opentimers_id_t id){
+    if (idmanager_getIsDAGroot() == TRUE)
+      return ;
+
+    cexample_task_cb();
+}
+
+void cexample_task_cb(void){
+    static int count=1;
+    int fd = cexample_vars.fd;
+    dprintf(fd,"[+] {%d} cexample_task_cb UPDATE if exist\n",count++);
+
+    return;
 }
