@@ -13,6 +13,9 @@
 
 //=========================== define ==========================================
 #define GRAPH_SIZE 10
+
+
+
 #define ADD_NEIGHBOR 32
 #define ADD_NEIGHBORS 33
 #define DEL_NEIGHBOR 34
@@ -28,9 +31,12 @@
 
 //=========================== typedef =========================================
 typedef struct {
-  int8_t rssi; // idmanager_getMyID(ADDR_16B);
-  uint8_t is_parent : 1;
-  uint8_t link : 1;
+  int8_t           rssi; // idmanager_getMyID(ADDR_16B);
+  uint8_t          numRx;
+  uint8_t          numTx;
+  uint8_t          is_parent : 1;
+  uint8_t          link : 1;
+  uint8_t          isStableNeighbor : 1;
 
 }graph_entry_t;
 
@@ -48,6 +54,9 @@ typedef struct {
 //=========================== prototypes ======================================
 
 void cexample_init(void);
+void cexample_send_link_update(void);
+
+void cexample_sendaddnewneighbor(uint8_t*m,uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to);
 
 
 /**

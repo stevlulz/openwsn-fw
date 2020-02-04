@@ -15,6 +15,7 @@
 #include "IEEE802154E.h"
 #include "schedule.h"
 #include "icmpv6rpl.h"
+#include "neighbors.h"
 
 
 #include <sys/types.h>
@@ -22,11 +23,13 @@
 #include <fcntl.h>
 #include <stdio.h>
 //=========================== defines =========================================
-#define CEXAMPLE_NOTIFY_PERIOD  10000
+#define CEXAMPLE_NOTIFY_PERIOD  60000
 #define CEXAMPLE_UPDATE_PERIOD  10000
 
 const uint8_t cexample_path0[] = "tasa";
 
+static uint8_t m[16] = {0xbb, 0xbb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x14, 0x15, 0x92, 0xcc, 0x00, 0x00, 0x00, 0x02};
 //=========================== variables =======================================
 
 cexample_vars_t cexample_vars;
@@ -50,6 +53,7 @@ void   cexample_parse(OpenQueueEntry_t* msg);
 
 void   cexample_timer_cb(opentimers_id_t id);
 void   cexample_task_cb(void);
+void   send_msg(void);
 //=========================== public ==========================================
 
 void cexample_init(void) {
@@ -60,7 +64,7 @@ void cexample_init(void) {
 
     unsigned int l = ((int)addr->addr_16b[0]);
     unsigned int r = ((int)addr->addr_16b[1]);
-    snprintf(file,50,"/home/stevlulz/Desktop/log.%d.%d.txt",l,r);
+    snprintf(file,50,"/home/stevlulz/Desktop/cexample_log.%d.%d.txt",l,r);
     cexample_vars.fd = open(file,O_CREAT | O_RDWR);
     int fd = cexample_vars.fd;
     if(r != 0x2 || l != 0x0){
@@ -79,10 +83,10 @@ void cexample_init(void) {
       );
         return ;
     }
-    dprintf(fd,"[+]{%d.%d} CENTRAL NODE\n",l,r);
+    else
+      dprintf(fd,"[+]{%d.%d} CENTRAL NODE\n",l,r);
 
 
-    // prepare the resource descriptor for the /ex path
     cexample_vars.desc.path0len             = sizeof(cexample_path0)-1;
     cexample_vars.desc.path0val             = (uint8_t*)(&cexample_path0);
     cexample_vars.desc.path1len             = 0;
@@ -145,33 +149,40 @@ void   cexample_parse(OpenQueueEntry_t* msg){
   int fd = cexample_vars.fd;
   uint8_t* input = msg->payload;
   open_addr_t srcAdd = msg->l3_sourceAdd;
-  uint16_t from_node = *((uint16_t*)&srcAdd.addr_128b[61]);
+  uint8_t *a = (uint8_t*)&srcAdd.addr_128b[0];
   uint8_t code;
-  uint16_t to_node;
-  dprintf(fd,"[+] FROM {%d}\n",from_node);
+  uint16_t to_node,from_node;
+  dprintf(fd,"[+] FROM {%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x}\n",a[120],a[121],a[122],a[123],a[124],a[125],a[126],a[127]);
 
   do {
     code = input[0];
     switch (code) {
       case ADD_NEIGHBOR:
-        if(input[3] != 0xff){
+        if(input[5] != 0xff){
             dprintf(fd,"\t[-] Parsing error {expected : 0xff -- found : 0x%02x}\n",input[3]);
             return;
         }
-        to_node = input[1]*0xff + input[2];
-        dprintf(fd,"\t[+] Link added to %02x %02x  --  %d\n",input[1],input[2],to_node);
+        from_node = input[1]*0xff + input[2];
+        to_node = input[3]*0xff + input[4];
+        for (uint8_t i = 1; i < GRAPH_SIZE; i++) {
+             cexample_vars.v[from_node][i].link = 0;
+             cexample_vars.v[from_node][i].rssi = 0;
 
+        }
+
+        cexample_vars.v[from_node][to_node].link = 1;
+        cexample_vars.v[from_node][to_node].rssi = 10;
+        dprintf(fd,"\t[+] Link added from %02x %02x to %02x %02x  -- from %d -- %d\n",input[1],input[2],input[3],input[4],from_node,to_node);
         //TODO add link
-        input = &input[3];
+        input = &input[5];
         break;
-        default:
+     default:
         dprintf(fd,"\t[+] MessageType does not exists %02x\n",code);
         return;
-        break;
     }
 
   } while(*input != 0xff);
-
+  cexample_log_topo();
 }
 owerror_t cexample_receive( OpenQueueEntry_t* msg,
         coap_header_iht*  coap_header,
@@ -191,7 +202,7 @@ owerror_t cexample_receive( OpenQueueEntry_t* msg,
               msg->payload                     = &(msg->packet[127]);
               msg->length                      = 0;
               // set the CoAP header
-              coap_header->Code                = COAP_CODE_RESP_CHANGED;
+              coap_header->Code                = COAP_CODE_RESP_CREATED;
               outcome                          = E_SUCCESS;
               break;
 
@@ -215,10 +226,118 @@ void cexample_timer_cb(opentimers_id_t id){
     cexample_task_cb();
 }
 
+int count = 0;
+void cexample_sendaddnewneighbor(uint8_t*m,uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to){
+      int fd = cexample_vars.fd;
+      OpenQueueEntry_t* pkt;
+      owerror_t outcome;
+      coap_option_iht options[1];
+
+
+      pkt = openqueue_getFreePacketBuffer(COMPONENT_CEXAMPLE);
+      if (pkt == NULL) {
+          openserial_printError(COMPONENT_CEXAMPLE,ERR_BUSY_SENDING,
+                                (errorparameter_t)0,
+                                (errorparameter_t)0);
+          return;
+      }
+      dprintf(fd,"[+] GOT FREE PACKET\n");
+
+      pkt->creator   = COMPONENT_CEXAMPLE;
+      pkt->owner      = COMPONENT_CEXAMPLE;
+      pkt->l4_protocol  = IANA_UDP;
+
+      packetfunctions_reserveHeaderSize(pkt,7);
+
+      pkt->payload[0] = 0x20; // add link code
+      pkt->payload[1] = l_from; // my ID {from_node}
+      pkt->payload[2] = r_from;
+
+      pkt->payload[3] = l_to; // neighbor ID  {to_node}
+      pkt->payload[4] = r_to;
+
+
+      pkt->payload[5] = 0xff;
+      pkt->payload[6] = 0xff;
+      dprintf(fd,"[+] COPIED BUFFER\n");
+      // location-path option
+      options[0].type = COAP_OPTION_NUM_URIPATH;
+      options[0].length = sizeof(cexample_path0) - 1;
+      options[0].pValue = (uint8_t *) cexample_path0;
+      //metada
+      pkt->l4_destination_port   = WKP_UDP_COAP;
+      pkt->l3_destinationAdd.type = ADDR_128B;
+       // set destination address here
+
+      memcpy(&pkt->l3_destinationAdd.addr_128b[0],&m[0],16);
+      dprintf(fd,"[+] INIT DESTINATION\n");
+
+      //send
+      outcome = opencoap_send(
+              pkt,
+              COAP_TYPE_CON,
+              COAP_CODE_REQ_PUT,
+              1, // token len
+              options,
+              1, // options len
+              &cexample_vars.desc
+              );
+      if (outcome == E_FAIL) {
+        openqueue_freePacketBuffer(pkt);
+        dprintf(fd,"[+] PACKET FAILED\n");
+        return ;
+      }
+      dprintf(fd,"[+] PACKET WAS SENT\n");
+}
+void cexample_send_link_update(void){
+    //INTERRUPT
+
+    uint8_t num = neighbors_getNumNeighbors();
+    int fd = cexample_vars.fd;
+    uint8_t *from,*to;
+    open_addr_t* tmp = NULL;
+    if(num == 0){
+      dprintf(fd,"\t[+] I DO NOT HAVE NEIGHBORS \n");
+      return;
+    }
+    if(num == 1){
+      for (uint8_t i = 0; i < 30; i++) {
+        if(neighbors_getUsed(i) == TRUE){
+          tmp = neighbors_get(i);
+          break;
+        }
+      }
+      if(tmp == NULL){
+        dprintf(fd,"\t[+] I DID NOT FIND A NEIGHBOR\n");
+        return;
+      }
+
+      from = idmanager_getMyID(ADDR_16B)->addr_16b;
+      to = &tmp->addr_64b[0];
+
+      dprintf(fd,"\t[+] I HAVE ONE NEIGHBOR \n"
+                 "\t\t[+] sent : FROM %02x %02x -- TO %02x %02x\n",
+                 from[0],from[1],to[6],to[7]);
+     dprintf(fd,"\t\t[+] I HAVE ONE NEIGHBOR \n");
+     dprintf(fd,"\n\t\t\t");
+     for (size_t i = 0; i < 8; i++) {
+        dprintf(fd,"%02x ",tmp->addr_64b[i]);
+     }
+     dprintf(fd,"\n");
+
+    cexample_sendaddnewneighbor(m,from[0],from[1],to[6],to[7]);
+    return ;
+    }
+
+    dprintf(fd,"\t[+] I HAVE MANY NEIGHBORS \n");
+
+}
 void cexample_task_cb(void){
-    static int count=1;
     int fd = cexample_vars.fd;
     dprintf(fd,"[+] {%d} cexample_task_cb UPDATE if exist\n",count++);
+    if(count > 40)
+      cexample_send_link_update();
+
 
     return;
 }

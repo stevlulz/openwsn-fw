@@ -14,6 +14,7 @@
 #include "openqueue.h"
 #include "openrandom.h"
 #include "opentimers.h"
+#include "tasamanager.h"
 //-- 02a-TSCH
 #include "adaptive_sync.h"
 #include "IEEE802154E.h"
@@ -54,6 +55,7 @@ void openstack_init(void) {
    idmanager_init();    // call first since initializes EUI64 and isDAGroot
    openqueue_init();
    openrandom_init();
+   idmanager_init();
 
    //-- 02a-TSCH
 //   adaptive_sync_init();
@@ -83,4 +85,3 @@ void openstack_init(void) {
       (errorparameter_t)0
    );
 }
-

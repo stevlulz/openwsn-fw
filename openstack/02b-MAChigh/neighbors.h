@@ -56,6 +56,9 @@ typedef struct {
 //=========================== prototypes ======================================
 
 void          neighbors_init(void);
+//ADDED
+
+
 
 // getters
 dagrank_t     neighbors_getNeighborRank(uint8_t index);
@@ -63,6 +66,12 @@ uint8_t       neighbors_getNumNeighbors(void);
 uint16_t      neighbors_getLinkMetric(uint8_t index);
 open_addr_t*  neighbors_getKANeighbor(uint16_t kaPeriod);
 open_addr_t*  neighbors_getJoinProxy(void);
+/*
+open_addr_t   neighbors_getAddr(uint8_t index);
+*/
+bool          neighbors_getUsed(uint8_t index);
+open_addr_t* neighbors_get(uint8_t index);
+
 bool          neighbors_getNeighborNoResource(uint8_t index);
 int8_t        neighbors_getRssi(uint8_t index);
 uint8_t       neighbors_getNumTx(uint8_t index);

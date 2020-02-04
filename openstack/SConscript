@@ -33,6 +33,7 @@ sources_c = [
     os.path.join('cross-layers','openqueue.c'),
     os.path.join('cross-layers','openrandom.c'),
     os.path.join('cross-layers','packetfunctions.c'),
+    os.path.join('cross-layers','tasamanager.c'),
 ]
 sources_h = [
     'openstack.h',
@@ -62,27 +63,28 @@ sources_h = [
     os.path.join('cross-layers','openqueue.h'),
     os.path.join('cross-layers','openrandom.h'),
     os.path.join('cross-layers','packetfunctions.h'),
+    os.path.join('cross-layers','tasamanager.h'),
     #=== apps
     os.path.join('#','openapps','userialbridge','userialbridge.h'),
 ]
 
 if localEnv['board']=='python':
-    
+
     for s in sources_c+sources_h:
         temp = localEnv.Objectify(
             target = localEnv.ObjectifiedFilename(s),
             source = s,
         )
         #localEnv.AlwaysBuild(temp)
-    
+
     libopenstack = localEnv.Library(
         target = target,
         source = [localEnv.ObjectifiedFilename(s) for s in sources_c],
     )
     localEnv.Depends(libopenstack,[localEnv.ObjectifiedFilename(s) for s in sources_h])
-    
+
 else:
-    
+
     localEnv.Append(
         CPPPATH =  [
             # inc
@@ -119,7 +121,7 @@ else:
             os.path.join('#','openapps','uexpiration_monitor'),
         ],
     )
-    
+
     libopenstack = localEnv.Library(
         target = target,
         source = sources_c,

@@ -27,6 +27,9 @@
 
 typedef struct {
    coap_resource_desc_t desc;
+
+   int fd;
+
 } c6t_vars_t;
 
 //=========================== prototypes ======================================

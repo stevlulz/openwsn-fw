@@ -42,6 +42,10 @@ void neighbors_init(void) {
 
 }
 
+
+
+//ADDED
+
 //===== getters
 
 /**
@@ -65,11 +69,23 @@ uint8_t neighbors_getNumNeighbors(void) {
 dagrank_t neighbors_getNeighborRank(uint8_t index) {
    return neighbors_vars.neighbors[index].DAGrank;
 }
+bool neighbors_getUsed(uint8_t index){
+  return neighbors_vars.neighbors[index].used;
+
+}
+
+open_addr_t* neighbors_get(uint8_t index){
+  return &neighbors_vars.neighbors[index].addr_64b;
+}
 
 int8_t neighbors_getRssi(uint8_t index){
    return neighbors_vars.neighbors[index].rssi;
 }
-
+/*
+open_addr_t neighbors_getAddr(uint8_t index){
+   return neighbors_vars.neighbors[index].addr_64b;
+}
+*/
 uint8_t neighbors_getNumTx(uint8_t index){
    return neighbors_vars.neighbors[index].numTx;
 }

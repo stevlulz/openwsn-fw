@@ -365,7 +365,6 @@ typedef struct {
 } OpenQueueEntry_t;
 
 
-BEGIN_PACK
 typedef struct {
    bool             used;
    bool             insecure;
@@ -386,7 +385,6 @@ typedef struct {
    uint8_t          backoffExponenton;
    uint8_t          backoff;
 } neighborRow_t;
-END_PACK
 
 
 //=========================== variables =======================================

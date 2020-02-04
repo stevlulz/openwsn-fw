@@ -13,6 +13,12 @@
 #include "neighbors.h"
 #include "msf.h"
 
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+
 //=========================== defines =========================================
 
 const uint8_t c6t_path0[] = "6t";
@@ -39,6 +45,17 @@ void    c6t_sendDone(
 void c6t_init(void) {
    if(idmanager_getIsDAGroot()==TRUE) return;
 
+   char file[50];
+   memset(file,0,50);
+   open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+
+   unsigned int l = ((int)addr->addr_16b[0]);
+   unsigned int r = ((int)addr->addr_16b[1]);
+   snprintf(file,50,"/home/stevlulz/Desktop/sixtop_log.%d.%d.txt",l,r);
+   cexample_vars.fd = open(file,O_CREAT | O_RDWR);
+   int fd = cexample_vars.fd;
+
+
    // prepare the resource descriptor for the /6t path
    c6t_vars.desc.path0len            = sizeof(c6t_path0)-1;
    c6t_vars.desc.path0val            = (uint8_t*)(&c6t_path0);
@@ -51,6 +68,7 @@ void c6t_init(void) {
    c6t_vars.desc.callbackSendDone    = &c6t_sendDone;
 
    opencoap_register(&c6t_vars.desc);
+   dprintf(fd,"[+] six top was initialized \n");
 }
 
 //=========================== private =========================================
@@ -76,15 +94,37 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
    bool                 foundNeighbor;
    cellInfo_ht          celllist_add[CELLLIST_MAX_LEN];
    cellInfo_ht          celllist_delete[CELLLIST_MAX_LEN];
-
+   uint8_t              celllist_count;
+   uint8_t              *input;
    switch (coap_header->Code) {
 
       case COAP_CODE_REQ_PUT:
          // add a slot
 
          // reset packet payload
-         msg->payload                  = &(msg->packet[127]);
-         msg->length                   = 0;
+
+         input =(uint8_t*) &msg->payload[0];
+          /*
+          bool      isUsed;
+          uint16_t  slotoffset;
+          uint16_t  channeloffset;
+          */
+         celllist_count = input[0];
+         int fd = cexample_vars.fd;
+         dprintf(fd,"[+] PUT : \n");
+         input = &input[1];
+         dprintf(fd,"\t[+] count : %d \n",(int)celllist_count);
+         for (size_t i = 0; i < celllist_count; i++){
+            celllist_add[i].isUsed = TRUE;
+            celllist_add[i].slotoffset =input[0] + input[1] * 0xFF ;
+            celllist_add[i].channeloffset = input[2] + input[3] * 0xFF;
+            input = &input[4];
+            dprintf(fd,"\t[+] slot : %d -- chann : %d\n",(int)celllist_add[i].slotoffset,celllist_add[i].channeloffset);
+         }
+         for (size_t i = celllist_count; i < CELLLIST_MAX_LEN; i++)
+            celllist_add[i].isUsed = FALSE;
+
+
 
          // get preferred parent
          foundNeighbor = icmpv6rpl_getPreferredParentEui64(&neighbor);
@@ -94,17 +134,19 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             break;
          }
 
+         /*
          if (msf_candidateAddCellList(celllist_add,1)==FALSE){
             // set the CoAP header
             outcome                       = E_FAIL;
             coap_header->Code             = COAP_CODE_RESP_CHANGED;
             break;
          }
+         */
          // call sixtop
          outcome = sixtop_request(
             IANA_6TOP_CMD_ADD,                  // code
             &neighbor,                          // neighbor
-            1,                                  // number cells
+            celllist_count,                     // number cells
             CELLOPTIONS_TX,                     // cellOptions
             celllist_add,                       // celllist to add
             NULL,                               // celllist to delete (not used)
@@ -112,8 +154,10 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             0,                                  // list command offset (not used)
             0                                   // list command maximum celllist (not used)
          );
-
+         dprintf(fd,"\t[+] sixtop_request done\n");
          // set the CoAP header
+         msg->payload                  = &(msg->packet[127]);
+         msg->length                   = 0;
          coap_header->Code             = COAP_CODE_RESP_CHANGED;
 
          break;
@@ -152,7 +196,6 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             0,                                  // list command offset (not used)
             0                                   // list command maximum celllist (not used)
          );
-
          // set the CoAP header
          coap_header->Code             = COAP_CODE_RESP_CHANGED;
          break;
