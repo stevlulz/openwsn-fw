@@ -158,23 +158,21 @@ void   cexample_parse(OpenQueueEntry_t* msg){
     code = input[0];
     switch (code) {
       case ADD_NEIGHBOR:
-        if(input[5] != 0xff){
-            dprintf(fd,"\t[-] Parsing error {expected : 0xff -- found : 0x%02x}\n",input[3]);
+        if(input[6] != 0xff){
+            dprintf(fd,"\t[-] Parsing error {expected : 0xff -- found : 0x%02x}\n",input[6]);
             return;
         }
         from_node = input[1]*0xff + input[2];
         to_node = input[3]*0xff + input[4];
-        for (uint8_t i = 1; i < GRAPH_SIZE; i++) {
+        uint8_t i;
+        for ( i = 1; i < GRAPH_SIZE; i++) {
              cexample_vars.v[from_node][i].link = 0;
              cexample_vars.v[from_node][i].rssi = 0;
-
         }
-
         cexample_vars.v[from_node][to_node].link = 1;
-        cexample_vars.v[from_node][to_node].rssi = 10;
-        dprintf(fd,"\t[+] Link added from %02x %02x to %02x %02x  -- from %d -- %d\n",input[1],input[2],input[3],input[4],from_node,to_node);
-        //TODO add link
-        input = &input[5];
+        cexample_vars.v[from_node][to_node].rssi = (int8_t)input[5];
+        dprintf(fd,"\t[+] Link added from %02x %02x to %02x %02x  -- from %d -- %d -- Rssi : %d\n",input[1],input[2],input[3],input[4],from_node,to_node,input[5]);
+        input = &input[6];
         break;
      default:
         dprintf(fd,"\t[+] MessageType does not exists %02x\n",code);
@@ -227,7 +225,7 @@ void cexample_timer_cb(opentimers_id_t id){
 }
 
 int count = 0;
-void cexample_sendaddnewneighbor(uint8_t*m,uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to){
+void cexample_sendaddnewneighbor(uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to,int8_t rssi){
       int fd = cexample_vars.fd;
       OpenQueueEntry_t* pkt;
       owerror_t outcome;
@@ -247,7 +245,7 @@ void cexample_sendaddnewneighbor(uint8_t*m,uint8_t l_from,uint8_t r_from,uint8_t
       pkt->owner      = COMPONENT_CEXAMPLE;
       pkt->l4_protocol  = IANA_UDP;
 
-      packetfunctions_reserveHeaderSize(pkt,7);
+      packetfunctions_reserveHeaderSize(pkt,8);
 
       pkt->payload[0] = 0x20; // add link code
       pkt->payload[1] = l_from; // my ID {from_node}
@@ -256,9 +254,10 @@ void cexample_sendaddnewneighbor(uint8_t*m,uint8_t l_from,uint8_t r_from,uint8_t
       pkt->payload[3] = l_to; // neighbor ID  {to_node}
       pkt->payload[4] = r_to;
 
+      pkt->payload[5] = rssi;
 
-      pkt->payload[5] = 0xff;
       pkt->payload[6] = 0xff;
+      pkt->payload[7] = 0xff;
       dprintf(fd,"[+] COPIED BUFFER\n");
       // location-path option
       options[0].type = COAP_OPTION_NUM_URIPATH;
@@ -301,7 +300,8 @@ void cexample_send_link_update(void){
       return;
     }
     if(num == 1){
-      for (uint8_t i = 0; i < 30; i++) {
+      uint8_t i;
+      for (i = 0; i < 30; i++) {
         if(neighbors_getUsed(i) == TRUE){
           tmp = neighbors_get(i);
           break;
@@ -314,18 +314,17 @@ void cexample_send_link_update(void){
 
       from = idmanager_getMyID(ADDR_16B)->addr_16b;
       to = &tmp->addr_64b[0];
-
+      int8_t rssi = neighbors_getRssi(i);
       dprintf(fd,"\t[+] I HAVE ONE NEIGHBOR \n"
-                 "\t\t[+] sent : FROM %02x %02x -- TO %02x %02x\n",
-                 from[0],from[1],to[6],to[7]);
-     dprintf(fd,"\t\t[+] I HAVE ONE NEIGHBOR \n");
+                 "\t\t[+] sent : FROM %02x %02x -- TO %02x %02x -- rssi %d\n",
+                 from[0],from[1],to[6],to[7],rssi);
      dprintf(fd,"\n\t\t\t");
      for (size_t i = 0; i < 8; i++) {
         dprintf(fd,"%02x ",tmp->addr_64b[i]);
      }
      dprintf(fd,"\n");
 
-    cexample_sendaddnewneighbor(m,from[0],from[1],to[6],to[7]);
+    cexample_sendaddnewneighbor(from[0],from[1],to[6],to[7],rssi);
     return ;
     }
 
@@ -334,10 +333,11 @@ void cexample_send_link_update(void){
 }
 void cexample_task_cb(void){
     int fd = cexample_vars.fd;
-    dprintf(fd,"[+] {%d} cexample_task_cb UPDATE if exist\n",count++);
-    if(count > 40)
-      cexample_send_link_update();
-
-
+    if (ieee154e_isSynch()==FALSE) {
+      dprintf(fd,"[+] {%d} NOT SYNCH\n",count++);
+      return;
+    }
+    dprintf(fd,"[+] {%d} cexample_task_cb SEND UPDATE\n",count++);
+    cexample_send_link_update();
     return;
 }

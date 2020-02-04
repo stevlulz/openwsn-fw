@@ -56,7 +56,7 @@ typedef struct {
 void cexample_init(void);
 void cexample_send_link_update(void);
 
-void cexample_sendaddnewneighbor(uint8_t*m,uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to);
+void cexample_sendaddnewneighbor(uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to,int8_t rssi);
 
 
 /**
