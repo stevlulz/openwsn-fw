@@ -31,6 +31,32 @@
 
 //=========================== typedef =========================================
 typedef struct {
+  uint8_t l_from;
+  uint8_t r_from;
+  uint8_t l_to;
+  uint8_t r_to;
+  int8_t  rssi;
+
+}link_anounce;
+
+typedef struct {
+  uint8_t l_to;
+  uint8_t r_to;
+   int8_t  rssi;
+}link_announce_t;
+
+typedef struct {
+  uint8_t code;
+  uint8_t flags : 7; //expand this later
+  uint8_t parent_exist : 1;
+  uint8_t neighbors_count;
+  uint8_t m_left;
+  uint8_t m_right;
+  uint8_t p_left;
+  uint8_t p_right;
+}links_update_t;
+
+typedef struct {
   int8_t           rssi; // idmanager_getMyID(ADDR_16B);
   uint8_t          numRx;
   uint8_t          numTx;
@@ -46,6 +72,9 @@ typedef struct {
 
 
    graph_entry_t v[GRAPH_SIZE+1][GRAPH_SIZE+1];
+
+   uint8_t          old : 1;
+
    int fd;
 } cexample_vars_t;
 
@@ -54,8 +83,7 @@ typedef struct {
 //=========================== prototypes ======================================
 
 void cexample_init(void);
-void cexample_send_link_update(void);
-
+void cexample_sendaddnewneighbors(void);
 void cexample_sendaddnewneighbor(uint8_t l_from,uint8_t r_from,uint8_t l_to,uint8_t r_to,int8_t rssi);
 
 

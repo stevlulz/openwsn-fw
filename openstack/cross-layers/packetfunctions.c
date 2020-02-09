@@ -82,12 +82,12 @@ void packetfunctions_mac16bToMac64b(open_addr_t* mac16b, open_addr_t* mac64btoWr
 bool packetfunctions_isBroadcastMulticast(open_addr_t* address) {
     uint8_t i;
     uint8_t address_length;
-    
+
     // anycast type
     if (address->type==ADDR_ANYCAST) {
         return TRUE;
     }
-    
+
     //IPv6 multicast
     if (address->type==ADDR_128B) {
         if (address->addr_128b[0]==0xff) {
@@ -96,7 +96,7 @@ bool packetfunctions_isBroadcastMulticast(open_addr_t* address) {
             return FALSE;
         }
     }
-    
+
     //15.4 broadcast
     switch (address->type) {
         case ADDR_16B:
@@ -115,7 +115,7 @@ bool packetfunctions_isBroadcastMulticast(open_addr_t* address) {
         if (address->addr_128b[i]!=0xFF) {
             return FALSE;
         }
-    }    
+    }
     return TRUE;
 }
 
@@ -179,7 +179,7 @@ bool packetfunctions_isLinkLocal(open_addr_t* address) {
       address->addr_128b[4]  == 0x00 &&
       address->addr_128b[5]  == 0x00 &&
       address->addr_128b[6]  == 0x00 &&
-      address->addr_128b[7]  == 0x00 
+      address->addr_128b[7]  == 0x00
    ) {
       return TRUE;
    }
@@ -188,7 +188,7 @@ bool packetfunctions_isLinkLocal(open_addr_t* address) {
 
 bool packetfunctions_sameAddress(open_addr_t* address_1, open_addr_t* address_2) {
    uint8_t address_length;
-   
+
    if (address_1->type!=address_2->type) {
       return FALSE;
    }
@@ -205,7 +205,7 @@ bool packetfunctions_sameAddress(open_addr_t* address_1, open_addr_t* address_2)
       case ADDR_ANYCAST:
          address_length = 16;
          break;
-    
+
       default:
          openserial_printCritical(COMPONENT_PACKETFUNCTIONS,ERR_WRONG_ADDR_TYPE,
                                (errorparameter_t)address_1->type,
@@ -223,7 +223,7 @@ bool packetfunctions_sameAddress(open_addr_t* address_1, open_addr_t* address_2)
 void packetfunctions_readAddress(uint8_t* payload, uint8_t type, open_addr_t* writeToAddress, bool littleEndian) {
    uint8_t i;
    uint8_t address_length;
-   
+
    writeToAddress->type = type;
    switch (type) {
       case ADDR_16B:
@@ -243,7 +243,7 @@ void packetfunctions_readAddress(uint8_t* payload, uint8_t type, open_addr_t* wr
                                (errorparameter_t)6);
          return;
    }
-   
+
    for (i=0;i<address_length;i++) {
       if (littleEndian) {
          writeToAddress->addr_128b[address_length-1-i] = *(payload+i);
@@ -256,7 +256,7 @@ void packetfunctions_readAddress(uint8_t* payload, uint8_t type, open_addr_t* wr
 void packetfunctions_writeAddress(OpenQueueEntry_t* msg, open_addr_t* address, bool littleEndian) {
    uint8_t i;
    uint8_t address_length;
-   
+
    switch (address->type) {
       case ADDR_16B:
       case ADDR_PANID:
@@ -275,7 +275,7 @@ void packetfunctions_writeAddress(OpenQueueEntry_t* msg, open_addr_t* address, b
                                (errorparameter_t)7);
          return;
    }
-   
+
    for (i=0;i<address_length;i++) {
       msg->payload      -= sizeof(uint8_t);
       msg->length       += sizeof(uint8_t);
@@ -331,7 +331,7 @@ void packetfunctions_tossFooter(OpenQueueEntry_t* pkt, uint8_t header_length) {
 //======= packet duplication
 // function duplicates a frame from one OpenQueueEntry structure to the other,
 // updating pointers to the new memory location. Used to make a local copy of
-// the frame before transmission (where it can possibly be encrypted). 
+// the frame before transmission (where it can possibly be encrypted).
 void packetfunctions_duplicatePacket(OpenQueueEntry_t* dst, OpenQueueEntry_t* src) {
    // make a copy of the frame
    memcpy(dst, src, sizeof(OpenQueueEntry_t));
@@ -406,56 +406,56 @@ void packetfunctions_calculateChecksum(OpenQueueEntry_t* msg, uint8_t* checksum_
     uint8_t temp_checksum[2];
     uint8_t little_helper[2];
     open_addr_t localscopeAddress;
-   
+
     // initialize running checksum
     temp_checksum[0]  = 0;
     temp_checksum[1]  = 0;
-   
+
     //===== IPv6 pseudo header
-    
+
     // determine the source and destination address format
     if (packetfunctions_isBroadcastMulticast(&msg->l3_destinationAdd)==TRUE){
         // use link local address for source address (prefix and EUI64)
-        
+
         // source address
         onesComplementSum(temp_checksum,(uint8_t*)linklocalprefix,8);
         memcpy(&localscopeAddress,idmanager_getMyID(ADDR_64B),sizeof(open_addr_t));
         // invert 'u' bit (section 2.5.1 at https://www.ietf.org/rfc/rfc2373.txt)
         localscopeAddress.addr_64b[0] ^= 0x02;
         onesComplementSum(temp_checksum,localscopeAddress.addr_64b,8);
-        
+
         // boardcast destination address
         onesComplementSum(temp_checksum,msg->l3_destinationAdd.addr_128b,16);
     } else {
         // use 128-bit ipv6 address for source address and destination address
-      
+
         // source address
         onesComplementSum(temp_checksum,(idmanager_getMyID(ADDR_PREFIX))->prefix,8);
         onesComplementSum(temp_checksum,(idmanager_getMyID(ADDR_64B))->addr_64b,8);
         // destination address
         onesComplementSum(temp_checksum,msg->l3_destinationAdd.addr_128b,16);
     }
-   
+
     // length
     little_helper[0] = 0;
     little_helper[1] = msg->length;
     onesComplementSum(temp_checksum,little_helper,2);
-   
+
     // next header
     little_helper[0] = 0;
     little_helper[1] = msg->l4_protocol;
     onesComplementSum(temp_checksum,little_helper,2);
-   
+
     //===== payload
-   
+
     // reset the checksum currently in the payload
     *checksum_ptr     = 0;
     *(checksum_ptr+1) = 0;
-   
+
     onesComplementSum(temp_checksum,msg->payload,msg->length);
     temp_checksum[0] ^= 0xFF;
     temp_checksum[1] ^= 0xFF;
-   
+
     //write in packet
     *checksum_ptr     = temp_checksum[0];
     *(checksum_ptr+1) = temp_checksum[1];
