@@ -23,10 +23,12 @@
 #include <fcntl.h>
 #include <stdio.h>
 //=========================== defines =========================================
-#define CEXAMPLE_NOTIFY_PERIOD  60000
-#define CEXAMPLE_UPDATE_PERIOD  10000
+#define CEXAMPLE_NOTIFY_PERIOD  90000
+#define CEXAMPLE_UPDATE_PERIOD  90000
 
 const uint8_t cexample_path0[] = "tasa";
+
+const uint8_t c6Y[] = "6t";
 
 static uint8_t m[16] = {0xbb, 0xbb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x14, 0x15, 0x92, 0xcc, 0x00, 0x00, 0x00, 0x02};
@@ -45,7 +47,7 @@ owerror_t cexample_receive( OpenQueueEntry_t* msg,
 
 void    cexample_sendDone(OpenQueueEntry_t* msg,
                        owerror_t error);
-
+void send6t(void);
 void   cexample_init_graph(void);
 void   cexample_log_topo(void);
 void   cexample_parse(OpenQueueEntry_t* msg);
@@ -53,8 +55,10 @@ void   cexample_parse(OpenQueueEntry_t* msg);
 
 void   cexample_timer_cb(opentimers_id_t id);
 void   cexample_task_cb(void);
-void   send_msg(void);
 
+void   cexample_timer_cb2(opentimers_id_t id);
+void   send_msg(void);
+void   request_first_join(void);
 void cexample_send_link_update(void);
 
 //=========================== public ==========================================
@@ -71,12 +75,13 @@ void cexample_init(void) {
     cexample_vars.fd = open(file,O_CREAT | O_RDWR);
     int fd = cexample_vars.fd;
     if(r != 0x2 || l != 0x0){
-        if(r == 0x0 && l == 0x0){
-          dprintf(fd,"[-]{%d.%d} ROOT(gateway) node\n",l,r);
+        if(r == 0x1 && l == 0x0){
+          dprintf(fd,"[-]{%d.%d} GATEWAY\n",l,r);
           return ;
         }
         dprintf(fd,"[-]{%d.%d} NON-CENTRAL node\n",l,r);
         cexample_vars.timerId    = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_COAP);
+        cexample_vars.join = 0;
         opentimers_scheduleIn(
             cexample_vars.timerId,
             CEXAMPLE_NOTIFY_PERIOD,
@@ -87,7 +92,7 @@ void cexample_init(void) {
         return ;
     }
     else
-      dprintf(fd,"[+]{%d.%d} CENTRAL NODE\n",l,r);
+      dprintf(fd,"[+]{%d.%d} CENTRAL \n",l,r);
 
 
     cexample_vars.desc.path0len             = sizeof(cexample_path0)-1;
@@ -104,15 +109,15 @@ void cexample_init(void) {
     opencoap_register(&cexample_vars.desc);
     cexample_init_graph();
     cexample_log_topo();
-    /*
+    cexample_vars.timerId    = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_COAP);
     opentimers_scheduleIn(
-        icmpv6rpl_vars.timerIdDIO,
-        SLOTFRAME_LENGTH*SLOTDURATION,
+        cexample_vars.timerId,
+        CEXAMPLE_UPDATE_PERIOD,
         TIME_MS,
         TIMER_PERIODIC,
-        icmpv6rpl_timer_DIO_cb
-    );
-    */
+        cexample_timer_cb2
+  );
+
 }
 
 //=========================== private =========================================
@@ -142,7 +147,7 @@ void   cexample_log_topo(void){
   dprintf(fd,"----------------------TOPOLOGY-START---------------------\n");
   for (size_t i = 0; i < GRAPH_SIZE+1; i++) {
     for (size_t j = 0; j < GRAPH_SIZE+1; j++){
-      dprintf(fd, "(%01x,%01x,%02x) ",cexample_vars.v[i][j].link,cexample_vars.v[i][j].is_parent,cexample_vars.v[i][j].rssi);
+      dprintf(fd, "(%01x,%01x,%3d) ",cexample_vars.v[i][j].link,cexample_vars.v[i][j].is_parent,cexample_vars.v[i][j].rssi);
     }
     dprintf(fd,"\n");
   }
@@ -271,10 +276,109 @@ void cexample_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
 }
 
 void cexample_timer_cb(opentimers_id_t id){
-    if (idmanager_getIsDAGroot() == TRUE)
-      return ;
+    //if (idmanager_getIsDAGroot() == TRUE)
+    //  return ;
+    // nodes
+    int fd = cexample_vars.fd;
 
+    if (ieee154e_isSynch()==FALSE) {
+        dprintf(fd,"[-]not synch\n");
+        return;
+    }
+    dprintf(fd,"[-]synch\n");
+
+    if(cexample_vars.join == 0){
+      request_first_join();
+    }
     cexample_task_cb();
+}
+void cexample_timer_cb2(opentimers_id_t id){
+    //if (idmanager_getIsDAGroot() == TRUE)
+    //  return ;
+    int fd = cexample_vars.fd;
+
+
+    //GATEWAY
+    /*
+    if (ieee154e_isSynch()==FALSE) {
+        dprintf(fd,"[+] NOT SYNCH\n");
+        return;
+    }
+    */
+
+    if(cexample_vars.join == 0){
+      request_first_join();
+    }
+    for (size_t i = 1; i < GRAPH_SIZE; i++) {
+      if(cexample_vars.v[i][5].link == 1 || cexample_vars.v[5][i].link == 1 )
+        goto here;
+    }
+
+    dprintf(fd,"[+] havent got 5 link\n");
+
+    return ;
+    here :
+    dprintf(fd,"[+] send 6t\n");
+    send6t();
+}
+
+void request_first_join(void){
+  int fd = cexample_vars.fd;
+  open_addr_t    parentNeighbor;
+  open_addr_t    nonParentNeighbor;
+  cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
+  bool           foundNeighbor;
+
+  foundNeighbor = icmpv6rpl_getPreferredParentEui64(&parentNeighbor);
+  if (foundNeighbor==FALSE) {
+      dprintf(fd,"[-] No parent found\n");
+      return;
+  }
+  dprintf(fd,"[+] have parent\n");
+
+  if (schedule_hasNegotiatedTxCellToNonParent(&parentNeighbor, &nonParentNeighbor)==TRUE){
+
+      // send a clear request to the non-parent neighbor
+      dprintf(fd,"[-] hasNegotiatedTxCellToNonParent \n");
+
+      sixtop_request(
+          IANA_6TOP_CMD_CLEAR,     // code
+          &nonParentNeighbor,      // neighbor
+          NUMCELLS_MSF,            // number cells
+          CELLOPTIONS_MSF,         // cellOptions
+          NULL,                    // celllist to add (not used)
+          NULL,                    // celllist to delete (not used)
+          IANA_6TISCH_SFID_MSF,    // sfid
+          0,                       // list command offset (not used)
+          0                        // list command maximum celllist (not used)
+      );
+  }
+
+
+  if (schedule_getNumberOfNegotiatedCells(&parentNeighbor, CELLTYPE_TX)==0){
+
+      if (msf_candidateAddCellList(celllist_add,NUMCELLS_MSF)==FALSE){
+          // failed to get cell list to add
+          dprintf(fd,"[+] failed to get cell list to add \n");
+
+          return;
+      }
+      dprintf(fd,"[+] negotiated with parent \n");
+
+      sixtop_request(
+          IANA_6TOP_CMD_ADD,           // code
+          &parentNeighbor,            // neighbor
+          NUMCELLS_MSF,                // number cells
+          CELLOPTIONS_TX,                 // cellOptions
+          celllist_add,                // celllist to add
+          NULL,                        // celllist to delete (not used)
+          IANA_6TISCH_SFID_MSF,        // sfid
+          0,                           // list command offset (not used)
+          0                            // list command maximum celllist (not used)
+      );
+   }
+   cexample_vars.join = 1;
+
 }
 
 int count = 0;
@@ -505,7 +609,6 @@ void cexample_sendaddnewneighbors(void){
 }
 
 
-
 void cexample_task_cb(void){
     int fd = cexample_vars.fd;
     if (ieee154e_isSynch()==FALSE) {
@@ -515,4 +618,73 @@ void cexample_task_cb(void){
     dprintf(fd,"[+] {%d} cexample_task_cb SEND UPDATE\n",count++);
     cexample_send_link_update();
     return;
+}
+
+
+void send6t(void){
+  int fd = cexample_vars.fd;
+
+  dprintf(fd,"[+] SEND6T\n");
+  OpenQueueEntry_t* pkt;
+  owerror_t outcome;
+  coap_option_iht options[1];
+
+
+  pkt = openqueue_getFreePacketBuffer(COMPONENT_CEXAMPLE);
+  if (pkt == NULL) {
+      openserial_printError(COMPONENT_CEXAMPLE,ERR_BUSY_SENDING,
+                            (errorparameter_t)0,
+                            (errorparameter_t)0);
+      return;
+  }
+  dprintf(fd,"[+] 6T GOT FREE PACKET\n");
+
+  pkt->creator   = COMPONENT_CEXAMPLE;
+  pkt->owner      = COMPONENT_CEXAMPLE;
+  pkt->l4_protocol  = IANA_UDP;
+  packetfunctions_reserveHeaderSize(pkt,9);
+  //0x02,0x0A,0x00,0xA,0x00,0xB,0x00,0xB,0x00
+
+  pkt->payload[0] = 0x2;
+  pkt->payload[1] = 0xF;
+  pkt->payload[2] = 0x0;
+  pkt->payload[3] = 0xF;
+  pkt->payload[4] = 0x0;
+  pkt->payload[5] = 0xC;
+  pkt->payload[6] = 0x0;
+  pkt->payload[7] = 0xC;
+  pkt->payload[8] = 0x0 ;
+
+
+  // location-path option
+  options[0].type = COAP_OPTION_NUM_URIPATH;
+  options[0].length = sizeof(c6Y) - 1;
+  options[0].pValue = (uint8_t *) c6Y;
+  //metada
+  pkt->l4_destination_port   = WKP_UDP_COAP;
+  pkt->l3_destinationAdd.type = ADDR_128B;
+   // set destination address here
+
+  memcpy(&pkt->l3_destinationAdd.addr_128b[0],&m[0],16);
+  pkt->l3_destinationAdd.addr_128b[15] = 5;
+  dprintf(fd,"[+] 6T INIT DESTINATION\n");
+
+  //send
+  outcome = opencoap_send(
+          pkt,
+          COAP_TYPE_CON,
+          COAP_CODE_REQ_PUT,
+          1, // token len
+          options,
+          1, // options len
+          &cexample_vars.desc
+          );
+  if (outcome == E_FAIL) {
+    openqueue_freePacketBuffer(pkt);
+    dprintf(fd,"[+] 6T PACKET FAILED\n");
+    return ;
+  }
+  dprintf(fd,"[+] 6T PACKET WAS SENT\n");
+
+
 }

@@ -52,8 +52,8 @@ void c6t_init(void) {
    unsigned int l = ((int)addr->addr_16b[0]);
    unsigned int r = ((int)addr->addr_16b[1]);
    snprintf(file,50,"/home/stevlulz/Desktop/sixtop_log.%d.%d.txt",l,r);
-   cexample_vars.fd = open(file,O_CREAT | O_RDWR);
-   int fd = cexample_vars.fd;
+   c6t_vars.fd = open(file,O_CREAT | O_RDWR);
+   int fd = c6t_vars.fd;
 
 
    // prepare the resource descriptor for the /6t path
@@ -96,6 +96,9 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
    cellInfo_ht          celllist_delete[CELLLIST_MAX_LEN];
    uint8_t              celllist_count;
    uint8_t              *input;
+   int fd = c6t_vars.fd;
+
+   dprintf(fd,"[+] C6T RECEIVE : \n");
    switch (coap_header->Code) {
 
       case COAP_CODE_REQ_PUT:
@@ -109,20 +112,21 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
           uint16_t  slotoffset;
           uint16_t  channeloffset;
           */
-         celllist_count = input[0];
-         int fd = cexample_vars.fd;
+         celllist_count = 4;//input[0];
          dprintf(fd,"[+] PUT : \n");
          input = &input[1];
          dprintf(fd,"\t[+] count : %d \n",(int)celllist_count);
+         for (size_t i = 0; i < CELLLIST_MAX_LEN; i++)
+            celllist_add[i].isUsed = FALSE;
+
          for (size_t i = 0; i < celllist_count; i++){
             celllist_add[i].isUsed = TRUE;
-            celllist_add[i].slotoffset =input[0] + input[1] * 0xFF ;
-            celllist_add[i].channeloffset = input[2] + input[3] * 0xFF;
+            celllist_add[i].slotoffset =0xF+i;//input[0] + input[1] * 0xFF ;
+            celllist_add[i].channeloffset =0xF+i;//input[2] + input[3] * 0xFF;
             input = &input[4];
             dprintf(fd,"\t[+] slot : %d -- chann : %d\n",(int)celllist_add[i].slotoffset,celllist_add[i].channeloffset);
          }
-         for (size_t i = celllist_count; i < CELLLIST_MAX_LEN; i++)
-            celllist_add[i].isUsed = FALSE;
+
 
 
 
@@ -134,15 +138,6 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             break;
          }
 
-         /*
-         if (msf_candidateAddCellList(celllist_add,1)==FALSE){
-            // set the CoAP header
-            outcome                       = E_FAIL;
-            coap_header->Code             = COAP_CODE_RESP_CHANGED;
-            break;
-         }
-         */
-         // call sixtop
          outcome = sixtop_request(
             IANA_6TOP_CMD_ADD,                  // code
             &neighbor,                          // neighbor
@@ -155,6 +150,12 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             0                                   // list command maximum celllist (not used)
          );
          dprintf(fd,"\t[+] sixtop_request done\n");
+         if(outcome == E_FAIL){
+           dprintf(fd,"\t[-] FAILED\n");
+         }
+         else{
+           dprintf(fd,"\t[!] SUCCESS\n");
+         }
          // set the CoAP header
          msg->payload                  = &(msg->packet[127]);
          msg->length                   = 0;
@@ -199,7 +200,6 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
          // set the CoAP header
          coap_header->Code             = COAP_CODE_RESP_CHANGED;
          break;
-
       default:
          outcome = E_FAIL;
          break;

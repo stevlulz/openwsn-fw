@@ -74,6 +74,7 @@ typedef struct {
    graph_entry_t v[GRAPH_SIZE+1][GRAPH_SIZE+1];
 
    uint8_t          old : 1;
+   uint8_t          join : 1;
 
    int fd;
 } cexample_vars_t;

@@ -41,7 +41,7 @@ void msf_housekeeping(void);
 void msf_init(void) {
 
     open_addr_t     temp_neighbor;
-
+    
     memset(&msf_vars,0,sizeof(msf_vars_t));
     msf_vars.numAppPacketsPerSlotFrame = 0;
     sixtop_setSFcallback(
@@ -62,6 +62,7 @@ void msf_init(void) {
         &temp_neighbor                                                   // neighbor
     );
 
+    /*
     msf_vars.housekeepingTimerId = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_MSF);
     msf_vars.housekeepingPeriod  = HOUSEKEEPING_PERIOD;
     opentimers_scheduleIn(
@@ -72,6 +73,8 @@ void msf_init(void) {
         msf_timer_housekeeping_cb
     );
     msf_vars.waitretryTimerId    = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_MSF);
+    */
+
 }
 
 // called by schedule
