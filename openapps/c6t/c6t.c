@@ -165,7 +165,7 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
 
       case COAP_CODE_REQ_DELETE:
          // delete a slot
-
+         /*
          // reset packet payload
          msg->payload                  = &(msg->packet[127]);
          msg->length                   = 0;
@@ -199,6 +199,11 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
          );
          // set the CoAP header
          coap_header->Code             = COAP_CODE_RESP_CHANGED;
+         break;
+         */
+         dprintf(fd,"\t[+] 6t DEL\n");
+         outcome = E_FAIL;
+
          break;
       default:
          outcome = E_FAIL;

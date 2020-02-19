@@ -41,7 +41,7 @@ void msf_housekeeping(void);
 void msf_init(void) {
 
     open_addr_t     temp_neighbor;
-    
+
     memset(&msf_vars,0,sizeof(msf_vars_t));
     msf_vars.numAppPacketsPerSlotFrame = 0;
     sixtop_setSFcallback(
@@ -367,7 +367,7 @@ void msf_trigger6pDelete(void){
         }
     }
 
-    if (msf_candidateRemoveCellList(celllist_delete,&neighbor,NUMCELLS_MSF, cellOptions)==FALSE){
+    if (msf_candidateRemoveCellList(celllist_delete,&neighbor,NUMCELLS_MSF, cellOptions)==FALSE || TRUE){
         // failed to get cell list to delete
         return;
     }
