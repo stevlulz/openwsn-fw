@@ -2,6 +2,17 @@
 \brief An example CoAP application.
 */
 
+
+/**
+
+  TODO
+      - Upon startup all nodes uses MSF.
+      - ALL nodes send neighbor information to Orch...
+      - Orch construct scheduling table
+      - [Orche] TRY to initilize the Scheduling table....
+      - [Orche] Start to announce scheduling information starting from nearest node to farest one.
+      - [Nodes {SENDER}] Upon receiving scheduling information, update the scheduling [slot,chan] with neighbor+Clear old one
+**/
 #include "opendefs.h"
 #include "cexample.h"
 #include "opencoap.h"
@@ -145,9 +156,9 @@ void cexample_init_graph(void){
 void   cexample_log_topo(void){
   int fd = cexample_vars.fd;
   dprintf(fd,"----------------------TOPOLOGY-START---------------------\n");
-  for (size_t i = 0; i < GRAPH_SIZE+1; i++) {
-    for (size_t j = 0; j < GRAPH_SIZE+1; j++){
-      dprintf(fd, "(%01x,%01x,%3d) ",cexample_vars.v[i][j].link,cexample_vars.v[i][j].is_parent,cexample_vars.v[i][j].rssi);
+  for (size_t i = 1; i < GRAPH_SIZE+1; i++) {
+    for (size_t j = 1; j < GRAPH_SIZE+1; j++){
+      dprintf(fd, "(%01x,%01x,%2d) ",cexample_vars.v[i][j].link,cexample_vars.v[i][j].is_parent,cexample_vars.v[i][j].rssi);
     }
     dprintf(fd,"\n");
   }
@@ -216,8 +227,8 @@ void   cexample_parse(OpenQueueEntry_t* msg){
       for ( i = 1; i < GRAPH_SIZE; i++) {
            cexample_vars.v[from][i].link = 0;
            cexample_vars.v[from][i].rssi = 0;
-           if(parent_exist)
-            cexample_vars.v[from][i].is_parent = 0;
+           //if(parent_exist)
+           cexample_vars.v[from][i].is_parent = 0;
       }
       up_links =(link_announce_t*) &input[7];
       for (uint8_t i = 0; i < count; i++) {

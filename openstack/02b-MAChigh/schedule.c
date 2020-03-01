@@ -1334,4 +1334,3 @@ void schedule_resetBackupEntry(backupEntry_t* e) {
     e->lastUsedAsn.byte4      = 0;
     e->next                   = NULL;
 }
-
