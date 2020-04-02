@@ -35,8 +35,8 @@ void openapps_init(void) {
    opencoap_init();     // initialize before any of the CoAP applications
 
    // CoAP
-   c6t_init();
-   //cinfo_init();
+   //c6t_init();
+   cinfo_init();
    cexample_init();
    //cleds__init();
    //cjoin_init();
