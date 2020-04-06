@@ -34,8 +34,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 //=========================== defines =========================================
-#define CEXAMPLE_NOTIFY_PERIOD  30000
-#define CEXAMPLE_UPDATE_PERIOD  15000
+#define CEXAMPLE_NOTIFY_PERIOD  20000
+#define CEXAMPLE_UPDATE_PERIOD  10000
 
 const uint8_t cexample_path0[] = "tasa";
 
@@ -76,6 +76,30 @@ void cexample_send_link_update(void);
 
 void cexample_init(void) {
     // check if am centrilized node ??
+
+    open_addr_t     temp_neighbor;
+    memset(&temp_neighbor,0,sizeof(temp_neighbor));
+    uint16_t        slot = SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS+
+                           (((((uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[6]))<<8) + (uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7])) %
+                           (SLOTFRAME_LENGTH-SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS));
+
+    uint16_t        channel = (((uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[6]))<<8) + (uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7]);
+
+    channel = channel % NUM_CHANNELS;
+
+    temp_neighbor.type             = ADDR_ANYCAST;
+    schedule_addActiveSlot(
+        slot,     // slot offset
+        CELLTYPE_RX,                                                     // type of slot
+        FALSE,                                                           // shared?
+        TRUE,                                                            // auto cell?
+        channel,  // channel offset
+        &temp_neighbor                                                   // neighbor
+    );
+
+
+
+
     char file[50];
     memset(file,0,50);
     open_addr_t* addr = idmanager_getMyID(ADDR_16B);
@@ -139,39 +163,12 @@ void cexample_timer_cb(opentimers_id_t id){
     }
     dprintf(fd,"[-]synch\n");
 
-    if(cexample_vars.join == 0){
-      request_first_join();
-    }
+    request_first_join();
+
     cexample_task_cb();
 }
 void cexample_timer_cb2(opentimers_id_t id){
-    //if (idmanager_getIsDAGroot() == TRUE)
-    //  return ;
-    int fd = cexample_vars.fd;
 
-
-    //GATEWAY
-    /*
-    if (ieee154e_isSynch()==FALSE) {
-        dprintf(fd,"[+] NOT SYNCH\n");
-        return;
-    }
-    */
-
-    if(cexample_vars.join == 0){
-      request_first_join();
-    }
-    for (size_t i = 1; i < GRAPH_SIZE; i++) {
-      if(cexample_vars.v[i][5].link == 1 || cexample_vars.v[5][i].link == 1 )
-        goto here;
-    }
-
-    dprintf(fd,"[+] havent got 5 link\n");
-
-    return ;
-    here :
-    dprintf(fd,"[+] send 6t\n");
-    send6t();
 }
 
 void request_first_join(void){
@@ -180,18 +177,19 @@ void request_first_join(void){
   open_addr_t    nonParentNeighbor;
   cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
   bool           foundNeighbor;
-
+/*
   foundNeighbor = icmpv6rpl_getPreferredParentEui64(&parentNeighbor);
   if (foundNeighbor==FALSE) {
-      dprintf(fd,"[-] No parent found\n");
+      dprintf(fd,"--------------------> No parent found\n");
       return;
   }
-  dprintf(fd,"[+] have parent\n");
+    dprintf(fd,"--------------------> parent found -- \n");
+  dprintf(fd,"----------------------> have parent\n");
 
   if (schedule_hasNegotiatedTxCellToNonParent(&parentNeighbor, &nonParentNeighbor)==TRUE){
 
       // send a clear request to the non-parent neighbor
-      dprintf(fd,"[-] hasNegotiatedTxCellToNonParent \n");
+      dprintf(fd,"-----------------> hasNegotiatedTxCellToNonParent \n");
 
       sixtop_request(
           IANA_6TOP_CMD_CLEAR,     // code
@@ -206,17 +204,31 @@ void request_first_join(void){
       );
   }
 
+    uint8_t num_ =schedule_getNumberOfNegotiatedCells(&parentNeighbor, CELLTYPE_TX);
+      dprintf(fd,"--------------------> Count %d \n",num_);
+  if (num_ ==0){
 
-  if (schedule_getNumberOfNegotiatedCells(&parentNeighbor, CELLTYPE_TX)==0){
-
-      if (msf_candidateAddCellList(celllist_add,NUMCELLS_MSF)==FALSE){
+      //if (msf_candidateAddCellList(celllist_add,NUMCELLS_MSF)==FALSE){
           // failed to get cell list to add
-          dprintf(fd,"[+] failed to get cell list to add \n");
+     //     dprintf(fd,"[+] failed to get cell list to add \n");
 
-          return;
-      }
-      dprintf(fd,"[+] negotiated with parent \n");
+       //   return;
+      //}
 
+      //  bool      isUsed;
+       // uint16_t  slotoffset;
+        //uint16_t  channeloffset;
+
+      uint8_t* from = idmanager_getMyID(ADDR_16B)->addr_16b;
+      celllist_add[1].isUsed = FALSE;
+      celllist_add[2].isUsed = FALSE;
+      celllist_add[3].isUsed = FALSE;
+      celllist_add[4].isUsed = FALSE;
+      celllist_add[5].isUsed = FALSE;
+      celllist_add[0].slotoffset =  (from[1]%101);
+      celllist_add[0].channeloffset = from[1]%15 ;
+      dprintf(fd,"[+] negotiated with parent id : %d -- slot : %d  -- channeloff : %d \n",
+                    from[1],celllist_add[0].slotoffset,celllist_add[0].channeloffset);
       sixtop_request(
           IANA_6TOP_CMD_ADD,           // code
           &parentNeighbor,            // neighbor
@@ -229,7 +241,8 @@ void request_first_join(void){
           0                            // list command maximum celllist (not used)
       );
    }
-   cexample_vars.join = 1;
+*/
+   cexample_vars.join = 0;
 
 }
 
@@ -455,7 +468,7 @@ void cexample_sendaddnewneighbors(void){
    //send
    outcome = opencoap_send(
            pkt,
-           COAP_TYPE_CON,
+           COAP_TYPE_NON,
            COAP_CODE_REQ_PUT,
            1, // token len
            options,
@@ -471,69 +484,5 @@ void cexample_sendaddnewneighbors(void){
 
 }
 void send6t(void){
-  int fd = cexample_vars.fd;
-
-  dprintf(fd,"[+] SEND6T\n");
-  OpenQueueEntry_t* pkt;
-  owerror_t outcome;
-  coap_option_iht options[1];
-
-
-  pkt = openqueue_getFreePacketBuffer(COMPONENT_CEXAMPLE);
-  if (pkt == NULL) {
-      openserial_printError(COMPONENT_CEXAMPLE,ERR_BUSY_SENDING,
-                            (errorparameter_t)0,
-                            (errorparameter_t)0);
-      return;
-  }
-  dprintf(fd,"[+] 6T GOT FREE PACKET\n");
-
-  pkt->creator   = COMPONENT_CEXAMPLE;
-  pkt->owner      = COMPONENT_CEXAMPLE;
-  pkt->l4_protocol  = IANA_UDP;
-  packetfunctions_reserveHeaderSize(pkt,9);
-  //0x02,0x0A,0x00,0xA,0x00,0xB,0x00,0xB,0x00
-
-  pkt->payload[0] = 0x2;
-  pkt->payload[1] = 0xF;
-  pkt->payload[2] = 0x0;
-  pkt->payload[3] = 0xF;
-  pkt->payload[4] = 0x0;
-  pkt->payload[5] = 0xC;
-  pkt->payload[6] = 0x0;
-  pkt->payload[7] = 0xC;
-  pkt->payload[8] = 0x0 ;
-
-
-  // location-path option
-  options[0].type = COAP_OPTION_NUM_URIPATH;
-  options[0].length = sizeof(c6Y) - 1;
-  options[0].pValue = (uint8_t *) c6Y;
-  //metada
-  pkt->l4_destination_port   = WKP_UDP_COAP;
-  pkt->l3_destinationAdd.type = ADDR_128B;
-   // set destination address here
-
-  memcpy(&pkt->l3_destinationAdd.addr_128b[0],&m[0],16);
-  pkt->l3_destinationAdd.addr_128b[15] = 5;
-  dprintf(fd,"[+] 6T INIT DESTINATION\n");
-
-  //send
-  outcome = opencoap_send(
-          pkt,
-          COAP_TYPE_CON,
-          COAP_CODE_REQ_PUT,
-          1, // token len
-          options,
-          1, // options len
-          &cexample_vars.desc
-          );
-  if (outcome == E_FAIL) {
-    openqueue_freePacketBuffer(pkt);
-    dprintf(fd,"[+] 6T PACKET FAILED\n");
-    return ;
-  }
-  dprintf(fd,"[+] 6T PACKET WAS SENT\n");
-
 
 }

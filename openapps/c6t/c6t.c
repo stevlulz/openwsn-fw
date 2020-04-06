@@ -43,8 +43,6 @@ void    c6t_sendDone(
 //=========================== public ==========================================
 
 void c6t_init(void) {
-   if(idmanager_getIsDAGroot()==TRUE) return;
-
    char file[50];
    memset(file,0,50);
    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
@@ -112,7 +110,20 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
           uint16_t  slotoffset;
           uint16_t  channeloffset;
           */
-         celllist_count = 4;//input[0];
+         celllist_count = (uint8_t) input[0];
+
+         if(celllist_count == 0xFF){
+            dprintf(fd,"===========================> called disable \n");
+            msf_disable();
+            msg->payload                  = &(msg->packet[127]);
+            msg->length                   = 0;
+            coap_header->Code             = COAP_CODE_RESP_CHANGED;
+            //openqueue_freePacketBuffer(msg);
+            return E_SUCCESS;
+         }
+
+
+
          dprintf(fd,"[+] PUT : \n");
          input = &input[1];
          dprintf(fd,"\t[+] count : %d \n",(int)celllist_count);
@@ -121,9 +132,9 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
 
          for (size_t i = 0; i < celllist_count; i++){
             celllist_add[i].isUsed = TRUE;
-            celllist_add[i].slotoffset =0xF+i;//input[0] + input[1] * 0xFF ;
-            celllist_add[i].channeloffset =0xF+i;//input[2] + input[3] * 0xFF;
-            input = &input[4];
+            celllist_add[i].slotoffset    = input[0];
+            celllist_add[i].channeloffset = input[1];//input[2] + input[3] * 0xFF;
+            input = &input[2];
             dprintf(fd,"\t[+] slot : %d -- chann : %d\n",(int)celllist_add[i].slotoffset,celllist_add[i].channeloffset);
          }
 

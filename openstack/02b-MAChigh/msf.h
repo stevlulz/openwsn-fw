@@ -44,9 +44,12 @@ typedef struct {
     bool                 needAddRx;
     bool                 needDeleteTx;
     bool                 needDeleteRx;
+    bool                 disabled;
     // for msf status report
     uint8_t              previousNumCellsUsed_tx;
     uint8_t              previousNumCellsUsed_rx;
+
+    int fd;
 } msf_vars_t;
 
 //=========================== module variables ================================
@@ -56,6 +59,9 @@ typedef struct {
 // admin
 void    msf_init(void);
 void    msf_appPktPeriod(uint8_t numAppPacketsPerSlotFrame);
+
+void    msf_disable(void);
+
 uint8_t msf_getsfid(void);
 bool    msf_candidateAddCellList(
     cellInfo_ht* cellList,

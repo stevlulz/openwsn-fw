@@ -4,7 +4,6 @@
 #include "sixtop.h"
 #include "scheduler.h"
 #include "schedule.h"
-#include "openapps.h"
 #include "openrandom.h"
 #include "idmanager.h"
 #include "icmpv6rpl.h"
@@ -37,11 +36,23 @@ void msf_trigger6pDelete(void);
 void msf_housekeeping(void);
 
 //=========================== public ==========================================
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 void msf_init(void) {
 
+    char file[50];
+    memset(file,0,50);
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    snprintf(file,50,"/home/stevlulz/Desktop/msf_log.%d.%d.txt",l,r);
+    msf_vars.fd = open(file,O_CREAT | O_RDWR);
+    int fd = msf_vars.fd;
     open_addr_t     temp_neighbor;
-
+    dprintf(fd,"MSF init\n");
     memset(&msf_vars,0,sizeof(msf_vars_t));
     msf_vars.numAppPacketsPerSlotFrame = 0;
     sixtop_setSFcallback(
@@ -61,8 +72,13 @@ void msf_init(void) {
         msf_hashFunction_getChanneloffset(idmanager_getMyID(ADDR_64B)),  // channel offset
         &temp_neighbor                                                   // neighbor
     );
+    if (r == 1){
+            msf_vars.disabled = TRUE;
+    }
+    else{
+        msf_vars.disabled = FALSE;
 
-    /*
+    }
     msf_vars.housekeepingTimerId = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_MSF);
     msf_vars.housekeepingPeriod  = HOUSEKEEPING_PERIOD;
     opentimers_scheduleIn(
@@ -73,13 +89,35 @@ void msf_init(void) {
         msf_timer_housekeeping_cb
     );
     msf_vars.waitretryTimerId    = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_MSF);
-    */
-
 }
 
+void    msf_disable(void){
+    //called by 6t when switching to centralized scheduling
+    int fd = msf_vars.fd;
+    msf_vars.disabled = TRUE;
+    dprintf(fd,"-----------------------------------------------------\n"
+               "-----------------------------------------------------\n"
+               "-----------------------------------------------------\n"
+               "-----------------------------------------------------\n"
+               "-----------------------------------------------------\n"
+               "-----------------------------------------------------\n"
+               "---->MSF disabled\n");
+
+    opentimers_cancel(msf_vars.housekeepingTimerId);
+    opentimers_cancel(msf_vars.waitretryTimerId);
+
+}
 // called by schedule
 void    msf_updateCellsElapsed(open_addr_t* neighbor, cellType_t type){
-/*
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_updateCellsElapsed------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_updateCellsElapsed (%d,%d)\n",l,r);
 #ifdef MSF_ADAPTING_TO_TRAFFIC
     if (icmpv6rpl_isPreferredParent(neighbor)==FALSE){
         return;
@@ -98,7 +136,7 @@ void    msf_updateCellsElapsed(open_addr_t* neighbor, cellType_t type){
         // not appliable
         return;
     }
-    return ;
+
     // addapt to upward traffic
 
     if (msf_vars.numCellsElapsed_tx == MAX_NUMCELLS){
@@ -147,11 +185,18 @@ void    msf_updateCellsElapsed(open_addr_t* neighbor, cellType_t type){
         msf_vars.numCellsUsed_rx    = 0;
     }
 #endif
-*/
 }
 
 void    msf_updateCellsUsed(open_addr_t* neighbor, cellType_t type){
-
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+        if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_updateCellsUsed------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_updateCellsUsed (%d,%d)\n",l,r);
     if (icmpv6rpl_isPreferredParent(neighbor)==FALSE){
         return;
     }
@@ -231,6 +276,15 @@ void msf_timer_waitretry_cb(opentimers_id_t id){
 }
 
 void msf_timer_housekeeping_cb(opentimers_id_t id){
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_timer_housekeeping_cb------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_timer_housekeeping_cb (%d,%d)\n",l,r);
     PORT_TIMER_WIDTH newDuration;
 
     // update the timer period
@@ -245,11 +299,28 @@ void msf_timer_housekeeping_cb(opentimers_id_t id){
 //=========================== tasks ============================================
 
 void msf_timer_housekeeping_task(void){
-
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_timer_housekeeping_task------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_timer_housekeeping_task (%d,%d)\n",l,r);
     msf_housekeeping();
 }
 
 void msf_timer_clear_task(void){
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_timer_clear_task------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_timer_clear_task\n");
     open_addr_t    neighbor;
     bool           foundNeighbor;
 
@@ -275,6 +346,15 @@ void msf_timer_clear_task(void){
 //=========================== private =========================================
 
 void msf_trigger6pAdd(void){
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_trigger6pAdd------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_trigger6pAdd\n");
     open_addr_t    neighbor;
     bool           foundNeighbor;
     cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
@@ -328,6 +408,15 @@ void msf_trigger6pAdd(void){
 }
 
 void msf_trigger6pDelete(void){
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_trigger6pDelete------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_trigger6pDelete\n");
     open_addr_t    neighbor;
     bool           foundNeighbor;
     cellInfo_ht    celllist_delete[CELLLIST_MAX_LEN];
@@ -368,7 +457,7 @@ void msf_trigger6pDelete(void){
         }
     }
 
-    if (msf_candidateRemoveCellList(celllist_delete,&neighbor,NUMCELLS_MSF, cellOptions)==FALSE || TRUE){
+    if (msf_candidateRemoveCellList(celllist_delete,&neighbor,NUMCELLS_MSF, cellOptions)==FALSE){
         // failed to get cell list to delete
         return;
     }
@@ -397,7 +486,15 @@ bool msf_candidateAddCellList(
     uint8_t i;
     frameLength_t slotoffset;
     uint8_t numCandCells;
-
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    int fd = msf_vars.fd;
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_candidateAddCellList------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_candidateAddCellList\n");
     memset(cellList,0,CELLLIST_MAX_LEN*sizeof(cellInfo_ht));
     numCandCells=0;
     for(i=0;i<CELLLIST_MAX_LEN;i++){
@@ -426,7 +523,15 @@ bool msf_candidateRemoveCellList(
     uint8_t              i;
     uint8_t              numCandCells;
     slotinfo_element_t   info;
-
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    int fd = msf_vars.fd;
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_candidateRemoveCellList------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_candidateRemoveCellList\n");
     memset(cellList,0,CELLLIST_MAX_LEN*sizeof(cellInfo_ht));
     numCandCells    = 0;
     for(i=0;i<schedule_getFrameLength();i++){
@@ -460,7 +565,15 @@ void msf_housekeeping(void){
     bool           foundNeighbor;
     cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
     cellInfo_ht    celllist_delete[CELLLIST_MAX_LEN];
-
+    int fd = msf_vars.fd;
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    if (msf_vars.disabled == TRUE){
+        dprintf(fd,"MSF msf_housekeeping------------------>DISABLED (%d,%d)\n",l,r);
+        return;
+    }
+    dprintf(fd,"MSF msf_housekeeping (%d,%d)\n",l,r);
     if (ieee154e_isSynch()==FALSE) {
         return;
     }
