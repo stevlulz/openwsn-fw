@@ -27,9 +27,10 @@
 
 typedef struct {
    coap_resource_desc_t desc;
-
-   int fd;
-
+   cellInfo_ht          celllist_delete[CELLLIST_MAX_LEN];
+   int valid;
+   int delete_count;
+   int                  fd;
 } c6t_vars_t;
 
 //=========================== prototypes ======================================

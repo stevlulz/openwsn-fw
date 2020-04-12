@@ -64,7 +64,7 @@ void c6t_init(void) {
    c6t_vars.desc.discoverable        = TRUE;
    c6t_vars.desc.callbackRx          = &c6t_receive;
    c6t_vars.desc.callbackSendDone    = &c6t_sendDone;
-
+   c6t_vars.valid = 0;
    opencoap_register(&c6t_vars.desc);
    dprintf(fd,"[+] six top was initialized \n");
 }
@@ -91,11 +91,9 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
    open_addr_t          neighbor;
    bool                 foundNeighbor;
    cellInfo_ht          celllist_add[CELLLIST_MAX_LEN];
-   cellInfo_ht          celllist_delete[CELLLIST_MAX_LEN];
    uint8_t              celllist_count;
    uint8_t              *input;
    int fd = c6t_vars.fd;
-
    dprintf(fd,"[+] C6T RECEIVE : \n");
    switch (coap_header->Code) {
 
@@ -105,13 +103,9 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
          // reset packet payload
 
          input =(uint8_t*) &msg->payload[0];
-          /*
-          bool      isUsed;
-          uint16_t  slotoffset;
-          uint16_t  channeloffset;
-          */
-         celllist_count = (uint8_t) input[0];
 
+         celllist_count = (uint8_t) input[0];
+         input = &input[1];
          if(celllist_count == 0xFF){
             dprintf(fd,"===========================> called disable \n");
             msf_disable();
@@ -122,37 +116,85 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             return E_SUCCESS;
          }
 
-
-
-         dprintf(fd,"[+] PUT : \n");
-         input = &input[1];
-         dprintf(fd,"\t[+] count : %d \n",(int)celllist_count);
-         for (size_t i = 0; i < CELLLIST_MAX_LEN; i++)
-            celllist_add[i].isUsed = FALSE;
-
-         for (size_t i = 0; i < celllist_count; i++){
-            celllist_add[i].isUsed = TRUE;
-            celllist_add[i].slotoffset    = input[0];
-            celllist_add[i].channeloffset = input[1];//input[2] + input[3] * 0xFF;
-            input = &input[2];
-            dprintf(fd,"\t[+] slot : %d -- chann : %d\n",(int)celllist_add[i].slotoffset,celllist_add[i].channeloffset);
-         }
-
-
-
-
          // get preferred parent
          foundNeighbor = icmpv6rpl_getPreferredParentEui64(&neighbor);
          if (foundNeighbor==FALSE) {
             outcome                    = E_FAIL;
             coap_header->Code          = COAP_CODE_RESP_PRECONDFAILED;
-            break;
          }
 
+        for (size_t i = 0; i < CELLLIST_MAX_LEN; i++){
+            celllist_add[i].isUsed = FALSE;
+            c6t_vars.celllist_delete[i].isUsed = FALSE;
+        }
+        size_t k =2;
+        size_t next_add = 0;
+        size_t next_delete = 0;
+        size_t performed = 0;
+        size_t tmp = celllist_count;
+        slotinfo_element_t  info;
+        c6t_vars.delete_count = 0;
+        dprintf(fd,"[+] PUT : \n");
+        dprintf(fd,"\t[+] count : %d \n",(int)celllist_count);
+        int next_slot = 0;
+        for(size_t l=0;l<celllist_count;l++){
+            schedule_getSlotInfo(input[0],&info);
+            if(info.address.type == ADDR_ANYCAST || info.link_type == CELLTYPE_TXRX){
+                dprintf(fd,"\t\tslot :( %d ) ADDR_ANYCAST or CELLTYPE_TXRX\n",input[0]);
+                input = &input[2];
+                continue;
+            }
+            celllist_add[next_slot].isUsed = TRUE;
+            celllist_add[next_slot].slotoffset    = input[0];
+            celllist_add[next_slot].channeloffset = input[1];
+            dprintf(fd,"\t\t[+] slot : %d  -- chan : %d\n",(int)celllist_add[next_slot].slotoffset,(int)celllist_add[next_slot].channeloffset);
+            input = &input[2];
+            next_slot++;
+        }
+
+        for(;k<102;k++){
+            dprintf(fd,"[+] iteration %d : \n",k);
+            schedule_getSlotInfo(k,&info);
+            if(info.address.type == ADDR_ANYCAST || info.link_type == CELLTYPE_TXRX){
+                dprintf(fd,"\t\tADDR_ANYCAST or CELLTYPE_TXRX\n");
+                if (input[0] == info.slotOffset){
+                    input = &input[2];
+                    tmp--;
+                }
+                continue;
+            }
+            if(info.link_type == CELLTYPE_TX && info.isAutoCell == FALSE ){
+
+                c6t_vars.celllist_delete[next_delete].isUsed = TRUE;
+                c6t_vars.celllist_delete[next_delete].slotoffset = info.slotOffset;
+                c6t_vars.celllist_delete[next_delete].channeloffset = info.channelOffset;
+                dprintf(fd,"\t\t[-] slot : %d -- chann : %d\n",
+                (int)c6t_vars.celllist_delete[next_delete].slotoffset,
+                c6t_vars.celllist_delete[next_delete].channeloffset
+                );
+                next_delete++;
+                c6t_vars.delete_count++;
+            }
+        }
+        //add new schedule
+
+        dprintf(fd,"TEST Added : %d -- Deleted : %d\n",next_add,next_delete);
+        for(int z=0;z<next_delete;z++){
+            dprintf(fd,"\t\tDELETE slot : %d -- chann : %d     %d\n",
+            (int)c6t_vars.celllist_delete[z].slotoffset,
+            (int)c6t_vars.celllist_delete[z].channeloffset,
+            (int)c6t_vars.celllist_delete[z].isUsed);
+        }
+        for(int z=0;z<next_slot;z++){
+            dprintf(fd,"\t\tADD slot : %d -- chann : %d     %d\n",
+            (int)celllist_add[z].slotoffset,
+            (int)celllist_add[z].channeloffset,
+            (int)celllist_add[z].isUsed);
+        }
          outcome = sixtop_request(
             IANA_6TOP_CMD_ADD,                  // code
             &neighbor,                          // neighbor
-            celllist_count,                     // number cells
+            next_slot,                     // number cells
             CELLOPTIONS_TX,                     // cellOptions
             celllist_add,                       // celllist to add
             NULL,                               // celllist to delete (not used)
@@ -160,6 +202,15 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             0,                                  // list command offset (not used)
             0                                   // list command maximum celllist (not used)
          );
+
+
+         msg->payload                  = &(msg->packet[127]);
+         msg->length                   = 0;
+         coap_header->Code             = COAP_CODE_RESP_CHANGED;
+
+
+
+        //DONE
          dprintf(fd,"\t[+] sixtop_request done\n");
          if(outcome == E_FAIL){
            dprintf(fd,"\t[-] FAILED\n");
@@ -167,53 +218,47 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
          else{
            dprintf(fd,"\t[!] SUCCESS\n");
          }
-         // set the CoAP header
-         msg->payload                  = &(msg->packet[127]);
-         msg->length                   = 0;
-         coap_header->Code             = COAP_CODE_RESP_CHANGED;
 
          break;
 
       case COAP_CODE_REQ_DELETE:
          // delete a slot
-         /*
-         // reset packet payload
-         msg->payload                  = &(msg->packet[127]);
-         msg->length                   = 0;
 
-         // get preferred parent
-         foundNeighbor = icmpv6rpl_getPreferredParentEui64(&neighbor);
-         if (foundNeighbor==FALSE) {
+        // reset packet payload
+        msg->payload                  = &(msg->packet[127]);
+        msg->length                   = 0;
+        dprintf(fd,"COAP DELETE \n");
+        // get preferred parent
+        foundNeighbor = icmpv6rpl_getPreferredParentEui64(&neighbor);
+        if (foundNeighbor==FALSE) {
             outcome                    = E_FAIL;
             coap_header->Code          = COAP_CODE_RESP_PRECONDFAILED;
             break;
-         }
-
-         // call sixtop
-         if (msf_candidateRemoveCellList(celllist_delete,&neighbor,1, CELLTYPE_TX)==FALSE){
-            // set the CoAP header
-            outcome                       = E_FAIL;
-            coap_header->Code             = COAP_CODE_RESP_CHANGED;
-            break;
-         }
-         // call sixtop
-         outcome = sixtop_request(
-            IANA_6TOP_CMD_ADD,                  // code
+        }
+        dprintf(fd,"COAP DELETE FOUND PARENT\n");
+        dprintf(fd,"DELETE COUNT %d\n",c6t_vars.delete_count);
+        outcome = sixtop_request(
+            IANA_6TOP_CMD_DELETE,                  // code
             &neighbor,                          // neighbor
-            1,                                  // number cells
-            CELLOPTIONS_TX,                     // cellOptions
-            celllist_add,                       // celllist to add
-            NULL,                               // celllist to delete (not used)
+            c6t_vars.delete_count,                     // number cells
+            CELLOPTIONS_RX,                     // cellOptions
+            NULL,                       // celllist to add
+            c6t_vars.celllist_delete,                               // celllist to delete (not used)
             msf_getsfid(),                      // sfid
             0,                                  // list command offset (not used)
             0                                   // list command maximum celllist (not used)
-         );
-         // set the CoAP header
-         coap_header->Code             = COAP_CODE_RESP_CHANGED;
-         break;
-         */
-         dprintf(fd,"\t[+] 6t DEL\n");
-         outcome = E_FAIL;
+        );
+        if(outcome == E_FAIL){
+            dprintf(fd,"\t[-] DELETE FAILED\n");
+        }
+        else{
+            dprintf(fd,"\t[!] DELETE SUCCESS\n");
+        }
+
+        coap_header->Code             = COAP_CODE_RESP_DELETED;
+
+        dprintf(fd,"\t[+] 6t DEL\n");
+        //outcome = E_FAIL;
 
          break;
       default:

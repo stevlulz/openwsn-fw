@@ -52,6 +52,7 @@ bool debugPrint_queue(void) {
    return TRUE;
 }
 
+
 //======= called by any component
 
 /**
@@ -98,7 +99,16 @@ OpenQueueEntry_t* openqueue_getFreePacketBuffer(uint8_t creator) {
    return NULL;
 }
 
-
+int            openqueue_getNumEmpty(){
+    int ret = 0;
+        // walk through queue and find free entry
+       for (size_t i=0;i<QUEUELENGTH;i++) {
+          if (openqueue_vars.queue[i].owner==COMPONENT_NULL) {
+            ret++;
+          }
+       }
+    return ret;
+}
 /**
 \brief Free a previously-allocated packet buffer.
 

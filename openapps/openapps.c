@@ -38,10 +38,10 @@ void openapps_init(void) {
    c6t_init();
    //cinfo_init();
    cexample_init();
-   cleds__init();
+   //cleds__init();
    //cjoin_init();
    //cwellknown_init();
-   //rrt_init();
+   rrt_init();
 
    // UDP
    //uecho_init();

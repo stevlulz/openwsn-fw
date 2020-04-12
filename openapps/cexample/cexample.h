@@ -56,22 +56,12 @@ typedef struct {
   uint8_t p_right;
 }links_update_t;
 
-typedef struct {
-  int8_t           rssi; // idmanager_getMyID(ADDR_16B);
-  uint8_t          numRx;
-  uint8_t          numTx;
-  uint8_t          is_parent : 1;
-  uint8_t          link : 1;
-  uint8_t          isStableNeighbor : 1;
-
-}graph_entry_t;
 
 typedef struct {
    coap_resource_desc_t         desc;
    opentimers_id_t              timerId;
 
 
-   graph_entry_t v[GRAPH_SIZE+1][GRAPH_SIZE+1];
 
    uint8_t          old : 1;
    uint8_t          join : 1;

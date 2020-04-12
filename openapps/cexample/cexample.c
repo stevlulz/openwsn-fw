@@ -34,8 +34,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 //=========================== defines =========================================
-#define CEXAMPLE_NOTIFY_PERIOD  20000
-#define CEXAMPLE_UPDATE_PERIOD  10000
+#define CEXAMPLE_NOTIFY_PERIOD  50000
+#define CEXAMPLE_UPDATE_PERIOD  50000
 
 const uint8_t cexample_path0[] = "tasa";
 
@@ -58,10 +58,7 @@ owerror_t cexample_receive( OpenQueueEntry_t* msg,
 
 void    cexample_sendDone(OpenQueueEntry_t* msg,
                        owerror_t error);
-void send6t(void);
-void   cexample_init_graph(void);
-void   cexample_log_topo(void);
-void   cexample_parse(OpenQueueEntry_t* msg);
+
 
 
 void   cexample_timer_cb(opentimers_id_t id);
@@ -78,7 +75,9 @@ void cexample_init(void) {
     // check if am centrilized node ??
 
     open_addr_t     temp_neighbor;
+
     memset(&temp_neighbor,0,sizeof(temp_neighbor));
+   /*
     uint16_t        slot = SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS+
                            (((((uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[6]))<<8) + (uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7])) %
                            (SLOTFRAME_LENGTH-SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS));
@@ -87,7 +86,7 @@ void cexample_init(void) {
 
     channel = channel % NUM_CHANNELS;
 
-    temp_neighbor.type             = ADDR_ANYCAST;
+
     schedule_addActiveSlot(
         slot,     // slot offset
         CELLTYPE_RX,                                                     // type of slot
@@ -97,15 +96,37 @@ void cexample_init(void) {
         &temp_neighbor                                                   // neighbor
     );
 
+    temp_neighbor.type             = ADDR_ANYCAST;
+    schedule_addActiveSlot(
+        1,     // slot offset
+        CELLTYPE_TXRX,                                                     // type of slot
+        TRUE,                                                           // shared?
+        FALSE,                                                            // auto cell?
+        SCHEDULE_MINIMAL_6TISCH_CHANNELOFFSET,  // channel offset
+        &temp_neighbor                                                   // neighbor
+    );
+    schedule_addActiveSlot(
+        2,     // slot offset
+        CELLTYPE_TXRX,                                                     // type of slot
+        TRUE,                                                           // shared?
+        FALSE,                                                            // auto cell?
+        SCHEDULE_MINIMAL_6TISCH_CHANNELOFFSET,  // channel offset
+        &temp_neighbor                                                   // neighbor
+    );
+
+*/
 
 
-
-    char file[50];
-    memset(file,0,50);
     open_addr_t* addr = idmanager_getMyID(ADDR_16B);
 
     unsigned int l = ((int)addr->addr_16b[0]);
     unsigned int r = ((int)addr->addr_16b[1]);
+    if(r == 0x1 && l == 0x0){
+      return;
+    }
+    char file[50];
+    memset(file,0,50);
+
     snprintf(file,50,"/home/stevlulz/Desktop/cexample_log.%d.%d.txt",l,r);
     cexample_vars.fd = open(file,O_CREAT | O_RDWR);
     int fd = cexample_vars.fd;
@@ -129,13 +150,6 @@ void cexample_init(void) {
 //=========================== private =========================================
 int count = 0;
 
-void cexample_init_graph(void){
-}
-void   cexample_log_topo(void){
-}
-void   cexample_parse(OpenQueueEntry_t* msg){
-
-}
 owerror_t cexample_receive( OpenQueueEntry_t* msg,
         coap_header_iht*  coap_header,
         coap_option_iht*  coap_incomingOptions,
@@ -161,9 +175,9 @@ void cexample_timer_cb(opentimers_id_t id){
         dprintf(fd,"[-]not synch\n");
         return;
     }
-    dprintf(fd,"[-]synch\n");
+    dprintf(fd,"[+]synch\n");
 
-    request_first_join();
+   // request_first_join();
 
     cexample_task_cb();
 }
@@ -172,77 +186,94 @@ void cexample_timer_cb2(opentimers_id_t id){
 }
 
 void request_first_join(void){
-  int fd = cexample_vars.fd;
-  open_addr_t    parentNeighbor;
-  open_addr_t    nonParentNeighbor;
-  cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
-  bool           foundNeighbor;
-/*
-  foundNeighbor = icmpv6rpl_getPreferredParentEui64(&parentNeighbor);
-  if (foundNeighbor==FALSE) {
-      dprintf(fd,"--------------------> No parent found\n");
-      return;
-  }
+    int fd = cexample_vars.fd;
+    open_addr_t    parentNeighbor;
+    open_addr_t    nonParentNeighbor;
+    cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
+    bool           foundNeighbor;
+
+    foundNeighbor = icmpv6rpl_getPreferredParentEui64(&parentNeighbor);
+    if (foundNeighbor==FALSE) {
+        dprintf(fd,"--------------------> No parent found\n");
+        return;
+    }
     dprintf(fd,"--------------------> parent found -- \n");
-  dprintf(fd,"----------------------> have parent\n");
+    dprintf(fd,"----------------------> have parent\n");
 
-  if (schedule_hasNegotiatedTxCellToNonParent(&parentNeighbor, &nonParentNeighbor)==TRUE){
+    if (schedule_hasNegotiatedTxCellToNonParent(&parentNeighbor, &nonParentNeighbor)==TRUE){
 
-      // send a clear request to the non-parent neighbor
-      dprintf(fd,"-----------------> hasNegotiatedTxCellToNonParent \n");
+        // send a clear request to the non-parent neighbor
+        dprintf(fd,"-----------------> hasNegotiatedTxCellToNonParent \n");
 
-      sixtop_request(
-          IANA_6TOP_CMD_CLEAR,     // code
-          &nonParentNeighbor,      // neighbor
-          NUMCELLS_MSF,            // number cells
-          CELLOPTIONS_MSF,         // cellOptions
-          NULL,                    // celllist to add (not used)
-          NULL,                    // celllist to delete (not used)
-          IANA_6TISCH_SFID_MSF,    // sfid
-          0,                       // list command offset (not used)
-          0                        // list command maximum celllist (not used)
-      );
-  }
+        sixtop_request(
+            IANA_6TOP_CMD_CLEAR,     // code
+            &nonParentNeighbor,      // neighbor
+            NUMCELLS_MSF,            // number cells
+            CELLOPTIONS_MSF,         // cellOptions
+            NULL,                    // celllist to add (not used)
+            NULL,                    // celllist to delete (not used)
+            IANA_6TISCH_SFID_MSF,    // sfid
+            0,                       // list command offset (not used)
+            0                        // list command maximum celllist (not used)
+        );
+    }
 
     uint8_t num_ =schedule_getNumberOfNegotiatedCells(&parentNeighbor, CELLTYPE_TX);
-      dprintf(fd,"--------------------> Count %d \n",num_);
-  if (num_ ==0){
+    dprintf(fd,"--------------------> Count %d \n",num_);
+    if (num_ < 1){
 
-      //if (msf_candidateAddCellList(celllist_add,NUMCELLS_MSF)==FALSE){
-          // failed to get cell list to add
-     //     dprintf(fd,"[+] failed to get cell list to add \n");
+        //if (msf_candidateAddCellList(celllist_add,NUMCELLS_MSF)==FALSE){
+        // failed to get cell list to add
+        //     dprintf(fd,"[+] failed to get cell list to add \n");
 
-       //   return;
-      //}
+        //   return;
+        //}
 
-      //  bool      isUsed;
-       // uint16_t  slotoffset;
+        //  bool      isUsed;
+        // uint16_t  slotoffset;
         //uint16_t  channeloffset;
 
-      uint8_t* from = idmanager_getMyID(ADDR_16B)->addr_16b;
-      celllist_add[1].isUsed = FALSE;
-      celllist_add[2].isUsed = FALSE;
-      celllist_add[3].isUsed = FALSE;
-      celllist_add[4].isUsed = FALSE;
-      celllist_add[5].isUsed = FALSE;
-      celllist_add[0].slotoffset =  (from[1]%101);
-      celllist_add[0].channeloffset = from[1]%15 ;
-      dprintf(fd,"[+] negotiated with parent id : %d -- slot : %d  -- channeloff : %d \n",
-                    from[1],celllist_add[0].slotoffset,celllist_add[0].channeloffset);
-      sixtop_request(
-          IANA_6TOP_CMD_ADD,           // code
-          &parentNeighbor,            // neighbor
-          NUMCELLS_MSF,                // number cells
-          CELLOPTIONS_TX,                 // cellOptions
-          celllist_add,                // celllist to add
-          NULL,                        // celllist to delete (not used)
-          IANA_6TISCH_SFID_MSF,        // sfid
-          0,                           // list command offset (not used)
-          0                            // list command maximum celllist (not used)
-      );
-   }
-*/
-   cexample_vars.join = 0;
+        uint8_t* from = idmanager_getMyID(ADDR_16B)->addr_16b;
+        celllist_add[0].isUsed = TRUE;
+        celllist_add[1].isUsed = FALSE;
+        celllist_add[2].isUsed = FALSE;
+        celllist_add[3].isUsed = FALSE;
+        celllist_add[4].isUsed = FALSE;
+        celllist_add[5].isUsed = FALSE;
+        for(int c=1;c<CELLLIST_MAX_LEN;c++)
+            celllist_add[c].isUsed = FALSE;
+
+        celllist_add[0].slotoffset =  (from[1]%101) + 40;
+        celllist_add[0].channeloffset = from[1]%15 ;
+
+
+        dprintf(
+                fd,"[+] negotiated with parent id : %d -> (%d,%d) -- slot : %d  -- channeloff : %d \n",
+                from[1],parentNeighbor.addr_16b[6],parentNeighbor.addr_16b[7],
+                celllist_add[0].slotoffset,celllist_add[0].channeloffset
+                );
+        owerror_t outcome = sixtop_request(
+            IANA_6TOP_CMD_ADD,           // code
+            &parentNeighbor,            // neighbor
+            1,                // number cells
+            CELLOPTIONS_TX,                 // cellOptions
+            celllist_add,                // celllist to add
+            NULL,                        // celllist to delete (not used)
+            IANA_6TISCH_SFID_MSF,        // sfid
+            0,                           // list command offset (not used)
+            0                            // list command maximum celllist (not used)
+        );
+
+         dprintf(fd,"\t[+] sixtop_request done\n");
+         if(outcome == E_FAIL){
+           dprintf(fd,"\t[-] FAILED\n");
+         }
+         else{
+           dprintf(fd,"\t[!] SUCCESS\n");
+         }
+    }
+
+    cexample_vars.join = 0;
 
 }
 
@@ -481,8 +512,5 @@ void cexample_sendaddnewneighbors(void){
      return ;
    }
    dprintf(fd,"[+] PACKET WAS SENT2\n");
-
-}
-void send6t(void){
 
 }

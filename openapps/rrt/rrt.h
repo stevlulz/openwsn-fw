@@ -21,6 +21,11 @@
 typedef struct {
 	coap_resource_desc_t desc;
 	uint8_t discovered;
+
+    opentimers_id_t              timerId;
+
+	int fd;
+	int start;
 } rrt_vars_t;
 
 //=========================== prototypes ======================================
