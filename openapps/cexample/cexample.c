@@ -77,45 +77,6 @@ void cexample_init(void) {
     open_addr_t     temp_neighbor;
 
     memset(&temp_neighbor,0,sizeof(temp_neighbor));
-   /*
-    uint16_t        slot = SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS+
-                           (((((uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[6]))<<8) + (uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7])) %
-                           (SLOTFRAME_LENGTH-SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS));
-
-    uint16_t        channel = (((uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[6]))<<8) + (uint16_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7]);
-
-    channel = channel % NUM_CHANNELS;
-
-
-    schedule_addActiveSlot(
-        slot,     // slot offset
-        CELLTYPE_RX,                                                     // type of slot
-        FALSE,                                                           // shared?
-        TRUE,                                                            // auto cell?
-        channel,  // channel offset
-        &temp_neighbor                                                   // neighbor
-    );
-
-    temp_neighbor.type             = ADDR_ANYCAST;
-    schedule_addActiveSlot(
-        1,     // slot offset
-        CELLTYPE_TXRX,                                                     // type of slot
-        TRUE,                                                           // shared?
-        FALSE,                                                            // auto cell?
-        SCHEDULE_MINIMAL_6TISCH_CHANNELOFFSET,  // channel offset
-        &temp_neighbor                                                   // neighbor
-    );
-    schedule_addActiveSlot(
-        2,     // slot offset
-        CELLTYPE_TXRX,                                                     // type of slot
-        TRUE,                                                           // shared?
-        FALSE,                                                            // auto cell?
-        SCHEDULE_MINIMAL_6TISCH_CHANNELOFFSET,  // channel offset
-        &temp_neighbor                                                   // neighbor
-    );
-
-*/
-
 
     open_addr_t* addr = idmanager_getMyID(ADDR_16B);
 
@@ -279,7 +240,6 @@ void request_first_join(void){
 
 void cexample_send_link_update(void){
     //INTERRUPT
-
     uint8_t num = neighbors_getNumNeighbors();
     int fd = cexample_vars.fd;
     uint8_t *from,*to;

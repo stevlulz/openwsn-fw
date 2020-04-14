@@ -33,7 +33,6 @@ sources_c = [
     os.path.join('cross-layers','openqueue.c'),
     os.path.join('cross-layers','openrandom.c'),
     os.path.join('cross-layers','packetfunctions.c'),
-    os.path.join('cross-layers','tasamanager.c'),
 ]
 sources_h = [
     'openstack.h',
@@ -63,7 +62,6 @@ sources_h = [
     os.path.join('cross-layers','openqueue.h'),
     os.path.join('cross-layers','openrandom.h'),
     os.path.join('cross-layers','packetfunctions.h'),
-    os.path.join('cross-layers','tasamanager.h'),
     #=== apps
     os.path.join('#','openapps','userialbridge','userialbridge.h'),
 ]

@@ -14,7 +14,6 @@
 #include "openqueue.h"
 #include "openrandom.h"
 #include "opentimers.h"
-#include "tasamanager.h"
 //-- 02a-TSCH
 #include "adaptive_sync.h"
 #include "IEEE802154E.h"

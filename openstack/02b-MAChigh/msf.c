@@ -113,7 +113,7 @@ void    msf_updateCellsElapsed(open_addr_t* neighbor, cellType_t type){
         //dprintf(fd,"MSF msf_updateCellsElapsed------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_updateCellsElapsed (%d,%d)\n",l,r);
+    //dprintf(fd,"MSF msf_updateCellsElapsed (%d,%d)\n",l,r);
 #ifdef MSF_ADAPTING_TO_TRAFFIC
     if (icmpv6rpl_isPreferredParent(neighbor)==FALSE){
         return;
@@ -192,7 +192,7 @@ void    msf_updateCellsUsed(open_addr_t* neighbor, cellType_t type){
        // dprintf(fd,"MSF msf_updateCellsUsed------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_updateCellsUsed (%d,%d)\n",l,r);
+    //dprintf(fd,"MSF msf_updateCellsUsed (%d,%d)\n",l,r);
     if (icmpv6rpl_isPreferredParent(neighbor)==FALSE){
         return;
     }
@@ -280,7 +280,7 @@ void msf_timer_housekeeping_cb(opentimers_id_t id){
       //  dprintf(fd,"MSF msf_timer_housekeeping_cb------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_timer_housekeeping_cb (%d,%d)\n",l,r);
+    //dprintf(fd,"MSF msf_timer_housekeeping_cb (%d,%d)\n",l,r);
     PORT_TIMER_WIDTH newDuration;
 
     // update the timer period
@@ -303,7 +303,7 @@ void msf_timer_housekeeping_task(void){
         //dprintf(fd,"MSF msf_timer_housekeeping_task------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_timer_housekeeping_task (%d,%d)\n",l,r);
+    //dprintf(fd,"MSF msf_timer_housekeeping_task (%d,%d)\n",l,r);
     msf_housekeeping();
 }
 
@@ -316,7 +316,7 @@ void msf_timer_clear_task(void){
         //dprintf(fd,"MSF msf_timer_clear_task------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_timer_clear_task\n");
+   // dprintf(fd,"MSF msf_timer_clear_task\n");
     open_addr_t    neighbor;
     bool           foundNeighbor;
 
@@ -350,7 +350,7 @@ void msf_trigger6pAdd(void){
        // dprintf(fd,"MSF msf_trigger6pAdd------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_trigger6pAdd\n");
+    //dprintf(fd,"MSF msf_trigger6pAdd\n");
     open_addr_t    neighbor;
     bool           foundNeighbor;
     cellInfo_ht    celllist_add[CELLLIST_MAX_LEN];
@@ -412,7 +412,7 @@ void msf_trigger6pDelete(void){
        // dprintf(fd,"MSF msf_trigger6pDelete------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_trigger6pDelete\n");
+    //dprintf(fd,"MSF msf_trigger6pDelete\n");
     open_addr_t    neighbor;
     bool           foundNeighbor;
     cellInfo_ht    celllist_delete[CELLLIST_MAX_LEN];
@@ -490,11 +490,12 @@ bool msf_candidateAddCellList(
       //  dprintf(fd,"MSF msf_candidateAddCellList------------------>DISABLED (%d,%d)\n",l,r);
         return FALSE;
     }
-    dprintf(fd,"MSF msf_candidateAddCellList\n");
+    //dprintf(fd,"MSF msf_candidateAddCellList\n");
     memset(cellList,0,CELLLIST_MAX_LEN*sizeof(cellInfo_ht));
     numCandCells=0;
     for(i=0;i<CELLLIST_MAX_LEN;i++){
-        slotoffset = openrandom_get16b()%schedule_getFrameLength();
+        //slotoffset = openrandom_get16b()%schedule_getFrameLength();
+        slotoffset = openrandom_get16b()%10;
         if(schedule_isSlotOffsetAvailable(slotoffset)==TRUE){
             cellList[numCandCells].slotoffset       = slotoffset;
             cellList[numCandCells].channeloffset    = openrandom_get16b()&0x0F;
@@ -527,10 +528,11 @@ bool msf_candidateRemoveCellList(
        // dprintf(fd,"MSF msf_candidateRemoveCellList------------------>DISABLED (%d,%d)\n",l,r);
         return FALSE;
     }
-    dprintf(fd,"MSF msf_candidateRemoveCellList\n");
+    //dprintf(fd,"MSF msf_candidateRemoveCellList\n");
     memset(cellList,0,CELLLIST_MAX_LEN*sizeof(cellInfo_ht));
     numCandCells    = 0;
-    for(i=0;i<schedule_getFrameLength();i++){
+    //for(i=0;i<schedule_getFrameLength();i++){
+    for(i=0;i<10;i++){
         schedule_getSlotInfo(i,&info);
         if(
             packetfunctions_sameAddress(neighbor, &(info.address)) &&
@@ -569,7 +571,7 @@ void msf_housekeeping(void){
         //dprintf(fd,"MSF msf_housekeeping------------------>DISABLED (%d,%d)\n",l,r);
         return;
     }
-    dprintf(fd,"MSF msf_housekeeping (%d,%d)\n",l,r);
+    //dprintf(fd,"MSF msf_housekeeping (%d,%d)\n",l,r);
     if (ieee154e_isSynch()==FALSE) {
         return;
     }

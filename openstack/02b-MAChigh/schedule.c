@@ -676,7 +676,7 @@ bool schedule_isSlotOffsetAvailable(uint16_t slotOffset){
 
    return TRUE;
 }
-
+//have access to just MSF allocated cells
 void schedule_removeAllNegotiatedCellsToNeighbor(
     uint8_t        slotframeID,
     open_addr_t*   neighbor
@@ -692,12 +692,13 @@ void schedule_removeAllNegotiatedCellsToNeighbor(
                 schedule_vars.scheduleBuf[i].type == CELLTYPE_RX
             )
         ){
-            schedule_removeActiveSlot(
-                schedule_vars.scheduleBuf[i].slotOffset,
-                schedule_vars.scheduleBuf[i].type,
-                schedule_vars.scheduleBuf[i].shared,
-                neighbor
-            );
+            if(schedule_vars.scheduleBuf[i].slotOffset < 10)
+                schedule_removeActiveSlot(
+                    schedule_vars.scheduleBuf[i].slotOffset,
+                    schedule_vars.scheduleBuf[i].type,
+                    schedule_vars.scheduleBuf[i].shared,
+                    neighbor
+                );
         }
     }
 }
