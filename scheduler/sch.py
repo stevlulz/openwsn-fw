@@ -173,7 +173,7 @@ def calc_scheduler():
     sched = {}
     print "Coloring : \n\t{}".format(d)
     start_time = time.time()
-    for i in range(3, 102):
+    for i in range(20, 102):
         init_save_tab()
 
         ret = update_metric()
@@ -357,12 +357,12 @@ def broadcast_scheduler(table):
         node_id_hex = "{}".format(hex(node_id))[2:]
         print 'coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex))
         print "\t{}".format(payload)
-        c.PUT('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
-              confirmable=False,
-              payload=payload
-              )
+        # c.PUT('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
+        #      confirmable=False,
+        #      payload=payload
+        #      )
     for node_id in nodes:
-        perform_delete = True
+        #perform_delete = True
         # payload = []
         payload_list = gen_payload(nodes[node_id])
         time_slots = nodes[node_id]
@@ -373,17 +373,17 @@ def broadcast_scheduler(table):
         print 'coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex))
         print "\t{}".format(payload_list)
         for pld in payload_list:
-            print "\tSENT : \n\t\t{}\n".format(payload_list[pld])
             c.PUT('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
                   confirmable=False,
                   payload=payload_list[pld]
                   )
-            if perform_delete:
-                c.DELETE('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
-                         confirmable=False,
-                         )
-                print "DELETE SENT\n"
-                perform_delete = False
+            print "\tSENT : \n\t\t{}\n".format(payload_list[pld])
+            # if perform_delete:
+            #    c.DELETE('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
+            #             confirmable=False,
+            #             )
+            #    print "DELETE SENT\n"
+            #    perform_delete = False
     return nodes
 
 
@@ -424,7 +424,8 @@ while True:
     topo_text   --> display console-text view of current topology
     topo_color  --> calculate minimum number of colors for nodes
     calc_sched  --> re-launch scheduling computation
-    queue       --> display queue\n
+    queue       --> display queue
+    anon        --> calculate scheduler and broadcast it to nodes\n
             """)
     elif user_input == "topo":
         plt.subplot(121)
