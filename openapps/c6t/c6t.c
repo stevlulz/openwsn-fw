@@ -52,7 +52,7 @@ void c6t_init(void) {
    snprintf(file,50,"/home/stevlulz/Desktop/sixtop_log.%d.%d.txt",l,r);
    c6t_vars.fd = open(file,O_CREAT | O_RDWR);
    int fd = c6t_vars.fd;
-
+   c6t_vars.done = 0;
 
    // prepare the resource descriptor for the /6t path
    c6t_vars.desc.path0len            = sizeof(c6t_path0)-1;
@@ -93,6 +93,7 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
    cellInfo_ht          celllist_add[CELLLIST_MAX_LEN];
    uint8_t              celllist_count;
    uint8_t              *input;
+   slotinfo_element_t  info;
    int fd = c6t_vars.fd;
    dprintf(fd,"[+] C6T RECEIVE : \n");
    switch (coap_header->Code) {
@@ -101,7 +102,12 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
          // add a slot
 
          // reset packet payload
-
+         if(c6t_vars.done == 1){
+             msg->payload                  = &(msg->packet[127]);
+             msg->length                   = 0;
+             coap_header->Code             = COAP_CODE_RESP_CHANGED;
+             return E_SUCCESS;
+         }
          input =(uint8_t*) &msg->payload[0];
 
          celllist_count = (uint8_t) input[0];
@@ -123,20 +129,12 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             coap_header->Code          = COAP_CODE_RESP_PRECONDFAILED;
          }
 
-        for (size_t i = 0; i < CELLLIST_MAX_LEN; i++){
-            celllist_add[i].isUsed = FALSE;
-            c6t_vars.celllist_delete[i].isUsed = FALSE;
-        }
-        size_t k =2;
-        size_t next_add = 0;
-        size_t next_delete = 0;
-        size_t performed = 0;
         size_t tmp = celllist_count;
-        slotinfo_element_t  info;
-        c6t_vars.delete_count = 0;
         dprintf(fd,"[+] PUT : \n");
         dprintf(fd,"\t[+] count : %d \n",(int)celllist_count);
-        int next_slot = 0;
+        for(int z = 0;z < 5;z++){
+            celllist_add[z].isUsed = FALSE;
+        }
         for(size_t l=0;l<celllist_count;l++){
             schedule_getSlotInfo(input[0],&info);
             if(info.address.type == ADDR_ANYCAST || info.link_type == CELLTYPE_TXRX){
@@ -144,57 +142,18 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
                 input = &input[2];
                 continue;
             }
-            celllist_add[next_slot].isUsed = TRUE;
-            celllist_add[next_slot].slotoffset    = input[0];
-            celllist_add[next_slot].channeloffset = input[1];
-            dprintf(fd,"\t\t[+] slot : %d  -- chan : %d\n",(int)celllist_add[next_slot].slotoffset,(int)celllist_add[next_slot].channeloffset);
+            celllist_add[l].isUsed = TRUE;
+            celllist_add[l].slotoffset    = input[0];
+            celllist_add[l].channeloffset = input[1];
+            dprintf(fd,"\t\t[+] slot : %d  -- chan : %d\n",(int)celllist_add[l].slotoffset,(int)celllist_add[l].channeloffset);
             input = &input[2];
-            next_slot++;
         }
 
-        for(;k<102;k++){
-            dprintf(fd,"[+] iteration %d : \n",k);
-            schedule_getSlotInfo(k,&info);
-            if(info.address.type == ADDR_ANYCAST || info.link_type == CELLTYPE_TXRX){
-                dprintf(fd,"\t\tADDR_ANYCAST or CELLTYPE_TXRX\n");
-                if (input[0] == info.slotOffset){
-                    input = &input[2];
-                    tmp--;
-                }
-                continue;
-            }
-            if(info.link_type == CELLTYPE_TX && info.isAutoCell == FALSE ){
 
-                c6t_vars.celllist_delete[next_delete].isUsed = TRUE;
-                c6t_vars.celllist_delete[next_delete].slotoffset = info.slotOffset;
-                c6t_vars.celllist_delete[next_delete].channeloffset = info.channelOffset;
-                dprintf(fd,"\t\t[-] slot : %d -- chann : %d\n",
-                (int)c6t_vars.celllist_delete[next_delete].slotoffset,
-                c6t_vars.celllist_delete[next_delete].channeloffset
-                );
-                next_delete++;
-                c6t_vars.delete_count++;
-            }
-        }
-        //add new schedule
-
-        dprintf(fd,"TEST Added : %d -- Deleted : %d\n",next_add,next_delete);
-        for(int z=0;z<next_delete;z++){
-            dprintf(fd,"\t\tDELETE slot : %d -- chann : %d     %d\n",
-            (int)c6t_vars.celllist_delete[z].slotoffset,
-            (int)c6t_vars.celllist_delete[z].channeloffset,
-            (int)c6t_vars.celllist_delete[z].isUsed);
-        }
-        for(int z=0;z<next_slot;z++){
-            dprintf(fd,"\t\tADD slot : %d -- chann : %d     %d\n",
-            (int)celllist_add[z].slotoffset,
-            (int)celllist_add[z].channeloffset,
-            (int)celllist_add[z].isUsed);
-        }
          outcome = sixtop_request(
             IANA_6TOP_CMD_ADD,                  // code
             &neighbor,                          // neighbor
-            next_slot,                     // number cells
+            celllist_count,                     // number cells
             CELLOPTIONS_TX,                     // cellOptions
             celllist_add,                       // celllist to add
             NULL,                               // celllist to delete (not used)
@@ -203,20 +162,29 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
             0                                   // list command maximum celllist (not used)
          );
 
-
          msg->payload                  = &(msg->packet[127]);
          msg->length                   = 0;
          coap_header->Code             = COAP_CODE_RESP_CHANGED;
-
-
-
         //DONE
          dprintf(fd,"\t[+] sixtop_request done\n");
          if(outcome == E_FAIL){
            dprintf(fd,"\t[-] FAILED\n");
          }
          else{
-           dprintf(fd,"\t[!] SUCCESS\n");
+            c6t_vars.done = 1;
+            dprintf(fd,"\t[!] SUCCESS\n");
+            dprintf(fd,"Content : \n");
+            for(int z=10;z<101;z++){
+                schedule_getSlotInfo(z,&info);
+                if(info.link_type != CELLTYPE_OFF){
+                    dprintf(fd,"\t\tADD slot : %d -- chann : %d\n",
+                    (int)info.slotOffset,
+                    (int)info.channelOffset);
+                }
+                else{
+                    dprintf(fd,"\t\tSlot : %d is empty\n",z);
+                }
+            }
          }
 
          break;
@@ -229,6 +197,7 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
         msg->length                   = 0;
         dprintf(fd,"COAP DELETE \n");
         // get preferred parent
+     /*
         foundNeighbor = icmpv6rpl_getPreferredParentEui64(&neighbor);
         if (foundNeighbor==FALSE) {
             outcome                    = E_FAIL;
@@ -261,6 +230,7 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
         //outcome = E_FAIL;
 
          break;
+*/
       default:
          outcome = E_FAIL;
          break;

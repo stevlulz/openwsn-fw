@@ -24,14 +24,15 @@ typedef struct {
 
     opentimers_id_t              timerId;
 
-	int fd;
 	int start;
+
+    int go;
+	int counter;
 } rrt_vars_t;
 
 //=========================== prototypes ======================================
 
 void rrt_init(void);
-
 void rrt_sendCoAPMsg(char actionMsg, uint8_t *ipv6mote);
 void rrt_sendDone(OpenQueueEntry_t* msg, owerror_t error);
 /**

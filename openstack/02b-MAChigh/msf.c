@@ -495,7 +495,7 @@ bool msf_candidateAddCellList(
     numCandCells=0;
     for(i=0;i<CELLLIST_MAX_LEN;i++){
         //slotoffset = openrandom_get16b()%schedule_getFrameLength();
-        slotoffset = openrandom_get16b()%10;
+        slotoffset = openrandom_get16b()% MSF_MAX;
         if(schedule_isSlotOffsetAvailable(slotoffset)==TRUE){
             cellList[numCandCells].slotoffset       = slotoffset;
             cellList[numCandCells].channeloffset    = openrandom_get16b()&0x0F;
@@ -532,7 +532,7 @@ bool msf_candidateRemoveCellList(
     memset(cellList,0,CELLLIST_MAX_LEN*sizeof(cellInfo_ht));
     numCandCells    = 0;
     //for(i=0;i<schedule_getFrameLength();i++){
-    for(i=0;i<10;i++){
+    for(i=0;i<MSF_MAX;i++){
         schedule_getSlotInfo(i,&info);
         if(
             packetfunctions_sameAddress(neighbor, &(info.address)) &&

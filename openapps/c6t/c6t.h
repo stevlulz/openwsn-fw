@@ -31,6 +31,8 @@ typedef struct {
    int valid;
    int delete_count;
    int                  fd;
+
+   int done;
 } c6t_vars_t;
 
 //=========================== prototypes ======================================

@@ -692,7 +692,7 @@ void schedule_removeAllNegotiatedCellsToNeighbor(
                 schedule_vars.scheduleBuf[i].type == CELLTYPE_RX
             )
         ){
-            if(schedule_vars.scheduleBuf[i].slotOffset < 10)
+            if(schedule_vars.scheduleBuf[i].slotOffset < MSF_MAX)
                 schedule_removeActiveSlot(
                     schedule_vars.scheduleBuf[i].slotOffset,
                     schedule_vars.scheduleBuf[i].type,

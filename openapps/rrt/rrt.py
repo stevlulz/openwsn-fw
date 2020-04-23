@@ -1,13 +1,14 @@
 import os
 import sys
+
 here = sys.path[0]
 print here
-sys.path.insert(0,os.path.join(here,'..','..','..','..','..','..','coap'))
+sys.path.insert(0, os.path.join(here, '..', '..', '..', '..', '..', '..', 'coap'))
 
 from coap import coap
 
 MOTE_IP = 'bbbb::1415:92cc:0:2'
-UDPPORT = 61618 # can't be the port used in OV
+UDPPORT = 61618  # can't be the port used in OV
 
 c = coap.coap(udpPort=UDPPORT)
 
@@ -17,7 +18,7 @@ print ''.join([chr(b) for b in p])
 
 p = c.PUT(
     'coap://[{0}]/rt'.format(MOTE_IP),
-    payload = [ord('2')],
+    payload=[ord('2')],
 )
 print ''.join([chr(b) for b in p])
 

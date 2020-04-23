@@ -342,7 +342,7 @@ void cexample_sendaddnewneighbor(uint8_t l_from,uint8_t r_from,uint8_t l_to,uint
       //send
       outcome = opencoap_send(
               pkt,
-              COAP_TYPE_NON,
+              COAP_TYPE_CON,
               COAP_CODE_REQ_PUT,
               1, // token len
               options,
@@ -459,7 +459,7 @@ void cexample_sendaddnewneighbors(void){
    //send
    outcome = opencoap_send(
            pkt,
-           COAP_TYPE_NON,
+           COAP_TYPE_CON,
            COAP_CODE_REQ_PUT,
            1, // token len
            options,

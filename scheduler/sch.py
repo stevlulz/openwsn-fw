@@ -28,7 +28,7 @@ def init_save_tab():
 
 def init_queue(max_=20):
     for i in range(1, 100):
-        queue[i] = 3
+        queue[i] = 1
 
 
 def display_queue():
@@ -362,7 +362,7 @@ def broadcast_scheduler(table):
         #      payload=payload
         #      )
     for node_id in nodes:
-        #perform_delete = True
+        # perform_delete = True
         # payload = []
         payload_list = gen_payload(nodes[node_id])
         time_slots = nodes[node_id]
@@ -373,11 +373,10 @@ def broadcast_scheduler(table):
         print 'coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex))
         print "\t{}".format(payload_list)
         for pld in payload_list:
+            print "\tTOBE SENT : \n\t\t{}\n".format(payload_list[pld])
             c.PUT('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
-                  confirmable=False,
                   payload=payload_list[pld]
                   )
-            print "\tSENT : \n\t\t{}\n".format(payload_list[pld])
             # if perform_delete:
             #    c.DELETE('coap://[{0}]/6t'.format("{}{}".format(mote_ip_prefix_112, node_id_hex)),
             #             confirmable=False,
@@ -425,7 +424,9 @@ while True:
     topo_color  --> calculate minimum number of colors for nodes
     calc_sched  --> re-launch scheduling computation
     queue       --> display queue
-    anon        --> calculate scheduler and broadcast it to nodes\n
+    anon        --> calculate scheduler and broadcast it to nodes
+    routing     --> display RPL TREE
+    routing_txt --> display RPL TREE in text format\n
             """)
     elif user_input == "topo":
         plt.subplot(121)

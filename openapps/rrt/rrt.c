@@ -65,8 +65,6 @@ void rrt_init(void) {
    if(idmanager_getIsDAGroot()==TRUE) return; 
 
 
-   char file[50];
-   memset(file,0,50);
    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
 
    unsigned int l = ((int)addr->addr_16b[0]);
@@ -74,10 +72,6 @@ void rrt_init(void) {
    if(r == 0x1 && l == 0x0){
       return;
    }
-   snprintf(file,50,"/home/stevlulz/Desktop/rtt.%d.%d.txt",l,r);
-   rrt_vars.fd = open(file,O_CREAT | O_RDWR);
-   int fd = rrt_vars.fd;
-   dprintf(fd,"INIT\n");
 
 
    // prepare the resource descriptor for the /rt path
@@ -91,13 +85,13 @@ void rrt_init(void) {
    rrt_vars.desc.callbackRx           = &rrt_receive;
    rrt_vars.desc.callbackSendDone     = &rrt_sendDone;
    rrt_vars.start = 0;
-
-
+   rrt_vars.counter = 0;
+   rrt_vars.go = 0;
    rrt_vars.discovered                = 0; //if this mote has been discovered by ringmaster
    rrt_vars.timerId    = opentimers_create(TIMER_GENERAL_PURPOSE, TASKPRIO_COAP);
    opentimers_scheduleIn(
         rrt_vars.timerId,
-        1000,
+        3000,
         TIME_MS,
         TIMER_PERIODIC,
         rrt_timer_cb
@@ -111,13 +105,7 @@ void rrt_init(void) {
 
 
 void   rrt_timer_cb(opentimers_id_t id){
-    int fd = rrt_vars.fd;
-    if(rrt_vars.start == 0){
-        dprintf(fd,"NOT STARTED YET\n");
-        return;
-    }
 
-    dprintf(fd,"TIMER\n");
 
     rrt_sendCoAPMsg(0,0);
 
@@ -152,8 +140,6 @@ owerror_t     rrt_receive(
       case COAP_CODE_REQ_DELETE:
          msg->payload                     = &(msg->packet[127]);
          msg->length                      = 0;
-        int fd = rrt_vars.fd;
-        dprintf(fd,"STARTED\n");
          // set the CoAP header
          coap_header->Code                = COAP_CODE_RESP_CONTENT;
          rrt_vars.start = 1;
@@ -169,15 +155,20 @@ owerror_t     rrt_receive(
 }
 
 void rrt_setGETRespMsg(OpenQueueEntry_t* msg, uint8_t count) {
-    struct timeval  tv;
-    gettimeofday(&tv, NULL);
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    long long time_in_mill =  (((long long)tv.tv_sec)*1000)+(tv.tv_usec/1000);
+
     msg->payload[0] = 120;
-    long time_in_mill = (tv.tv_sec) * 1000 + (tv.tv_usec) ;
+
     memset((char*)&msg->payload[1],0,count-1);
     int queue_size = openqueue_getNumEmpty();
-    int fd = rrt_vars.fd;
-    dprintf(fd,"TIME %ld , QUEUE : %d\n",time_in_mill,queue_size);
-    snprintf((char*)&msg->payload[1],(size_t)count,"%ld;%u",time_in_mill,queue_size);
+    open_addr_t* addr = idmanager_getMyID(ADDR_16B);
+    unsigned int l = ((int)addr->addr_16b[0]);
+    unsigned int r = ((int)addr->addr_16b[1]);
+    rrt_vars.counter++;
+
+    snprintf((char*)&msg->payload[1],(size_t)count,"%lld;%u;%d;%d;%d",time_in_mill,queue_size,l,r,rrt_vars.counter);
 
 }
 
@@ -185,11 +176,17 @@ void rrt_setGETRespMsg(OpenQueueEntry_t* msg, uint8_t count) {
  * if mote is 0, then send to the ringmater, defined by ipAddr_ringmaster
 **/
 void rrt_sendCoAPMsg(char actionMsg, uint8_t *ipv6mote) {
+    if(rrt_vars.start == 0){
+        return;
+    }
+    rrt_vars.go++;
+
+    if(rrt_vars.go < 80)
+        return;
       OpenQueueEntry_t* pkt;
       owerror_t outcome;
       coap_option_iht options[2];
       uint8_t medType;
-          int fd = rrt_vars.fd;
 
 
       pkt = openqueue_getFreePacketBuffer(COMPONENT_RRT);
@@ -199,13 +196,12 @@ void rrt_sendCoAPMsg(char actionMsg, uint8_t *ipv6mote) {
                                 (errorparameter_t)0);
           return;
       }
-      dprintf(fd,"FOUND FREE BUFFEER\n");
       pkt->creator   = COMPONENT_RRT;
       pkt->owner      = COMPONENT_RRT;
       pkt->l4_protocol  = IANA_UDP;
 
-      packetfunctions_reserveHeaderSize(pkt, 25);
-      rrt_setGETRespMsg(pkt,25);
+      packetfunctions_reserveHeaderSize(pkt, 28);
+      rrt_setGETRespMsg(pkt,28);
       // location-path option
       options[0].type = COAP_OPTION_NUM_URIPATH;
       options[0].length = sizeof(tasa) - 1;
@@ -223,18 +219,16 @@ void rrt_sendCoAPMsg(char actionMsg, uint8_t *ipv6mote) {
       // set destination address here
       memcpy(&pkt->l3_destinationAdd.addr_128b[0], &sid, 16);
 
-      dprintf(fd,"COPIED ADDR\n");
       //send
       outcome = opencoap_send(
               pkt,
-              COAP_TYPE_NON,
+              COAP_TYPE_CON,
               COAP_CODE_REQ_PUT,
               1, // token len
               options,
               2, // options len
               &rrt_vars.desc
               );
-      dprintf(fd,"SENT\n");
       if (outcome == E_FAIL) {
         openqueue_freePacketBuffer(pkt);
       }

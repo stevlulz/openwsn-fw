@@ -41,6 +41,11 @@ static const uint8_t infoStackName[] = "OpenWSN ";
 // maximum celllist length
 #define CELLLIST_MAX_LEN 5
 
+
+//maximum msf celllist
+
+#define MSF_MAX 49
+
 enum {
    E_SUCCESS                           = 0,
    E_FAIL                              = 1,
