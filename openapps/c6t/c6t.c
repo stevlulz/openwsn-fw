@@ -164,13 +164,14 @@ owerror_t c6t_receive(OpenQueueEntry_t* msg,
 
          msg->payload                  = &(msg->packet[127]);
          msg->length                   = 0;
-         coap_header->Code             = COAP_CODE_RESP_CHANGED;
         //DONE
          dprintf(fd,"\t[+] sixtop_request done\n");
          if(outcome == E_FAIL){
            dprintf(fd,"\t[-] FAILED\n");
+           coap_header->Code          = COAP_CODE_RESP_PRECONDFAILED;
          }
          else{
+            coap_header->Code             = COAP_CODE_RESP_CHANGED;
             c6t_vars.done = 1;
             dprintf(fd,"\t[!] SUCCESS\n");
             dprintf(fd,"Content : \n");
